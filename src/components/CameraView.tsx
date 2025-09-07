@@ -58,6 +58,27 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     };
   }, [facingMode, capturedImage]);
 
+  // Ensure video plays when stream changes
+  useEffect(() => {
+    if (stream && videoRef.current && isCameraActive) {
+      console.log('Stream changed, ensuring video plays');
+      videoRef.current.srcObject = stream;
+      
+      const playVideo = () => {
+        if (videoRef.current) {
+          videoRef.current.play().then(() => {
+            console.log('Video playing successfully');
+          }).catch((error) => {
+            console.error('Video play failed, retrying:', error);
+            setTimeout(playVideo, 200);
+          });
+        }
+      };
+      
+      playVideo();
+    }
+  }, [stream, isCameraActive]);
+
   const startCamera = async () => {
     try {
       setCameraError(null);
@@ -150,16 +171,42 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        // Add event listeners for debugging
+        
+        // Force video to play immediately
         videoRef.current.onloadedmetadata = () => {
           console.log('Camera stream loaded successfully');
+          if (videoRef.current) {
+            videoRef.current.play().then(() => {
+              console.log('Video is now playing');
+            }).catch((error) => {
+              console.error('Video play failed:', error);
+              // Try to play again after a short delay
+              setTimeout(() => {
+                if (videoRef.current) {
+                  videoRef.current.play().catch(console.error);
+                }
+              }, 100);
+            });
+          }
+        };
+        
+        videoRef.current.oncanplay = () => {
+          console.log('Video can play');
           if (videoRef.current) {
             videoRef.current.play().catch(console.error);
           }
         };
+        
         videoRef.current.onerror = (error) => {
           console.error('Video element error:', error);
         };
+        
+        // Force play immediately
+        setTimeout(() => {
+          if (videoRef.current && videoRef.current.srcObject) {
+            videoRef.current.play().catch(console.error);
+          }
+        }, 100);
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
@@ -479,7 +526,14 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
               autoPlay
               playsInline
               muted
+              controls={false}
               className="w-full h-full object-cover"
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+                backgroundColor: '#000'
+              }}
             />
             {/* Camera Controls Overlay */}
             <div className="absolute top-4 right-4 flex flex-col gap-2">
@@ -510,6 +564,13 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
                   {availableCameras.length} cameras
                 </div>
               )}
+            </div>
+            
+            {/* Debug Info Overlay */}
+            <div className="absolute top-4 left-4 text-xs text-white/70 bg-black/50 px-2 py-1 rounded">
+              <div>Stream: {stream ? '✅' : '❌'}</div>
+              <div>Active: {isCameraActive ? '✅' : '❌'}</div>
+              <div>Video: {videoRef.current?.readyState || 'N/A'}</div>
             </div>
             {/* Hidden canvas for capturing */}
             <canvas ref={canvasRef} className="hidden" />

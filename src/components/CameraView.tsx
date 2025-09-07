@@ -247,6 +247,7 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     
     setIsSwitchingCamera(true);
     setIsCameraActive(false);
+    setCameraError(null);
     
     try {
       // Stop current camera completely
@@ -259,7 +260,7 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       }
       
       // Wait for complete cleanup
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Switch facing mode
       const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
@@ -267,9 +268,10 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       setFacingMode(newFacingMode);
       
       // Wait for state update
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Start new camera
+      // Start new camera with fresh state
+      setIsStartingCamera(true);
       await startCamera();
       
     } catch (error) {
@@ -450,17 +452,23 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       exit={{ opacity: 0 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 text-white">
+      <div className="flex items-center justify-between p-4 text-white bg-gradient-to-r from-black/80 to-transparent backdrop-blur-sm">
         <Button
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="text-white hover:bg-white/20"
+          className="w-10 h-10 rounded-full hover:bg-white/10 transition-all duration-200"
         >
           <X className="w-6 h-6" />
         </Button>
-        <h1 className="font-medium">Create Memory</h1>
-        <div className="w-10" />
+        <div className="text-center">
+          <h1 className="font-semibold text-lg">Create Memory</h1>
+          <p className="text-xs text-white/60">Capture your moment</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-xs text-white/60">Live</span>
+        </div>
       </div>
 
       {/* Camera/Preview Area */}
@@ -536,42 +544,39 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
               }}
             />
             {/* Camera Controls Overlay */}
-            <div className="absolute top-4 right-4 flex flex-col gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={switchCamera}
-                disabled={isSwitchingCamera}
-                className="w-10 h-10 rounded-full border-white/30 text-white hover:bg-white/10 bg-black/50 disabled:opacity-50"
-                title={`Switch to ${facingMode === 'user' ? 'back' : 'front'} camera`}
-              >
-                {isSwitchingCamera ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                  </motion.div>
-                ) : (
-                  <RotateCcw className="w-5 h-5" />
-                )}
-              </Button>
-              <div className="text-xs text-white/70 bg-black/50 px-2 py-1 rounded">
-                {facingMode === 'user' ? 'Front' : 'Back'}
+            <div className="absolute top-4 right-4 flex flex-col gap-3">
+              <div className="flex flex-col items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={switchCamera}
+                  disabled={isSwitchingCamera}
+                  className="w-12 h-12 rounded-full border-white/20 text-white hover:bg-white/10 bg-black/40 backdrop-blur-sm disabled:opacity-50 transition-all duration-200 shadow-lg"
+                  title={`Switch to ${facingMode === 'user' ? 'back' : 'front'} camera`}
+                >
+                  {isSwitchingCamera ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    >
+                      <RotateCcw className="w-6 h-6" />
+                    </motion.div>
+                  ) : (
+                    <RotateCcw className="w-6 h-6" />
+                  )}
+                </Button>
+                <div className="text-xs text-white/80 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full border border-white/10">
+                  {facingMode === 'user' ? '📱 Front' : '📷 Back'}
+                </div>
               </div>
+              
               {availableCameras.length > 1 && (
-                <div className="text-xs text-white/50 bg-black/30 px-2 py-1 rounded">
+                <div className="text-xs text-white/60 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/5">
                   {availableCameras.length} cameras
                 </div>
               )}
             </div>
             
-            {/* Debug Info Overlay */}
-            <div className="absolute top-4 left-4 text-xs text-white/70 bg-black/50 px-2 py-1 rounded">
-              <div>Stream: {stream ? '✅' : '❌'}</div>
-              <div>Active: {isCameraActive ? '✅' : '❌'}</div>
-              <div>Video: {videoRef.current?.readyState || 'N/A'}</div>
-            </div>
             {/* Hidden canvas for capturing */}
             <canvas ref={canvasRef} className="hidden" />
           </>
@@ -601,22 +606,22 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
           </div>
         ) : isStartingCamera ? (
           <div className="flex flex-col items-center justify-center h-full text-white">
-            <div className="w-32 h-32 rounded-full border-4 border-white/20 flex items-center justify-center mb-8">
+            <div className="w-32 h-32 rounded-full border-4 border-white/20 flex items-center justify-center mb-8 bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
               >
-                <Camera className="w-16 h-16 text-white/60" />
+                <Camera className="w-16 h-16 text-white/80" />
               </motion.div>
             </div>
-            <h2 className="mb-2">🎥 Starting Camera...</h2>
+            <h2 className="mb-2 text-xl font-semibold">🎥 Starting Camera...</h2>
             <p className="text-white/60 text-center px-8 mb-8">
               Please allow camera access to continue
             </p>
             <div className="mt-6">
               <Button
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 text-sm"
+                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 text-sm rounded-full shadow-lg transition-all duration-200"
               >
                 📁 Upload Photo Instead
               </Button>
@@ -644,32 +649,34 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       </div>
 
       {/* Bottom Controls */}
-      <div className="p-6 bg-black">
+      <div className="p-6 bg-gradient-to-t from-black/90 to-transparent backdrop-blur-sm">
         {!capturedImage ? (
-          <div className="flex items-center justify-center space-x-8">
+          <div className="flex items-center justify-center space-x-12">
             <Button
               variant="outline"
               size="icon"
-              className="w-12 h-12 rounded-full border-white/30 text-white hover:bg-white/10"
+              className="w-14 h-14 rounded-full border-white/20 text-white hover:bg-white/10 bg-black/40 backdrop-blur-sm transition-all duration-200 shadow-lg"
               onClick={() => fileInputRef.current?.click()}
             >
-              <span className="text-xs">📁</span>
+              <span className="text-lg">📁</span>
             </Button>
             
             <motion.button
-              className="w-20 h-20 rounded-full bg-white border-4 border-gray-400 shadow-lg"
+              className="w-20 h-20 rounded-full bg-white border-4 border-white/30 shadow-2xl hover:scale-105 transition-all duration-200"
               whileTap={{ scale: 0.95 }}
               onClick={handleCapture}
             >
-              <div className="w-full h-full rounded-full bg-white"></div>
+              <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                <Camera className="w-8 h-8 text-black" />
+              </div>
             </motion.button>
 
             <Button
               variant="outline"
               size="icon"
-              className="w-12 h-12 rounded-full border-white/30 text-white hover:bg-white/10"
+              className="w-14 h-14 rounded-full border-white/20 text-white hover:bg-white/10 bg-black/40 backdrop-blur-sm transition-all duration-200 shadow-lg"
             >
-              <Zap className="w-5 h-5" />
+              <Zap className="w-7 h-7" />
             </Button>
 
             <input

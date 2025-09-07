@@ -119,14 +119,14 @@ function ReelPost({ post, isActive, onLike, onComment, onDuet, onFollow, onSaveP
 
       {/* Author info */}
       <motion.div
-        className="absolute top-16 left-3 right-3 sm:left-4 sm:right-4 z-20"
+        className="absolute top-20 left-4 right-4 z-20"
         initial={{ opacity: 0 }}
         animate={{ opacity: isActive ? 1 : 0.8 }}
         transition={{ duration: 0.3 }}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full p-0.5">
+          <div className="flex items-center space-x-3 flex-1">
+            <div className="w-11 h-11 rounded-full border-2 border-white p-0.5">
               <ImageWithFallback
                 src={post.authorAvatar}
                 alt={post.author}
@@ -211,7 +211,7 @@ function ReelPost({ post, isActive, onLike, onComment, onDuet, onFollow, onSaveP
 
       {/* Side Actions */}
       <motion.div
-        className="absolute right-1 sm:right-2 bottom-24 sm:bottom-32 flex flex-col items-center space-y-2 sm:space-y-3 z-20"
+        className="absolute right-4 bottom-40 flex flex-col items-center space-y-4 z-20"
         initial={{ opacity: 0 }}
         animate={{ opacity: isActive ? 1 : 0.8 }}
         transition={{ duration: 0.3 }}
@@ -220,42 +220,39 @@ function ReelPost({ post, isActive, onLike, onComment, onDuet, onFollow, onSaveP
         <div className="flex flex-col items-center">
           <button
             onClick={handleLike}
-            className="p-1 sm:p-2 hover:scale-110 transition-transform touch-manipulation"
-            style={{ minWidth: '36px', minHeight: '36px' }}
+            className="p-3 hover:scale-110 transition-transform"
           >
             <Heart 
-              className={`w-5 h-5 sm:w-6 sm:h-6 ${
+              className={`w-7 h-7 ${
                 isLiked 
                   ? 'fill-red-500 text-red-500' 
                   : 'text-white hover:text-red-400'
               } transition-colors`} 
             />
           </button>
-          <span className="text-white text-xs mt-0.5">{likes.toLocaleString()}</span>
+          <span className="text-white text-sm mt-1">{likes.toLocaleString()}</span>
         </div>
 
         {/* Comment */}
         <div className="flex flex-col items-center">
           <button
             onClick={() => onComment(post.id)}
-            className="p-1 sm:p-2 hover:scale-110 transition-transform touch-manipulation"
-            style={{ minWidth: '36px', minHeight: '36px' }}
+            className="p-3 hover:scale-110 transition-transform"
           >
-            <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white hover:text-blue-400 transition-colors" />
+            <MessageCircle className="w-7 h-7 text-white hover:text-blue-400 transition-colors" />
           </button>
-          <span className="text-white text-xs mt-0.5">{post.comments}</span>
+          <span className="text-white text-sm mt-1">{post.comments}</span>
         </div>
 
         {/* Send/Share */}
         <div className="flex flex-col items-center relative">
           <button 
             onClick={() => setShowShareMenu(!showShareMenu)}
-            className="p-1 sm:p-2 hover:scale-110 transition-transform touch-manipulation"
-            style={{ minWidth: '36px', minHeight: '36px' }}
+            className="p-3 hover:scale-110 transition-transform"
           >
-            <Send className="w-5 h-5 sm:w-6 sm:h-6 text-white hover:text-blue-400 transition-colors" />
+            <Send className="w-7 h-7 text-white hover:text-blue-400 transition-colors" />
           </button>
-          <span className="text-white text-xs mt-0.5">{post.shares}</span>
+          <span className="text-white text-sm mt-1">{post.shares}</span>
           
           {/* Share menu */}
           <AnimatePresence>
@@ -291,11 +288,10 @@ function ReelPost({ post, isActive, onLike, onComment, onDuet, onFollow, onSaveP
               setIsBookmarked(!isBookmarked);
               onSavePost(post.id);
             }}
-            className="p-1 sm:p-2 hover:scale-110 transition-transform touch-manipulation"
-            style={{ minWidth: '36px', minHeight: '36px' }}
+            className="p-3 hover:scale-110 transition-transform"
           >
             <Bookmark 
-              className={`w-5 h-5 sm:w-6 sm:h-6 ${
+              className={`w-7 h-7 ${
                 isBookmarked 
                   ? 'fill-white text-white' 
                   : 'text-white hover:text-gray-300'
@@ -307,7 +303,7 @@ function ReelPost({ post, isActive, onLike, onComment, onDuet, onFollow, onSaveP
 
       {/* Bottom content */}
       <motion.div
-        className="absolute bottom-4 sm:bottom-6 left-2 sm:left-3 right-12 sm:right-16 z-20"
+        className="absolute bottom-8 left-4 right-20 z-20"
         initial={{ opacity: 0 }}
         animate={{ opacity: isActive ? 1 : 0.8 }}
         transition={{ duration: 0.3 }}
@@ -400,29 +396,24 @@ export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePos
   }, [currentIndex, posts.length]);
 
   return (
-    <div className="w-full h-full relative overflow-hidden bg-black" style={{
-      height: '100%',
-      minHeight: '100%',
-      touchAction: 'pan-y pinch-zoom'
-    }}>
+    <div className="w-full h-full relative overflow-hidden bg-black">
       {/* Stories Header */}
       <motion.div
-        className="absolute top-0 left-0 right-0 z-40 bg-black/80 backdrop-blur-md"
+        className="absolute top-0 left-0 right-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/10"
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ type: "spring", duration: 0.6 }}
       >
-        <div className="px-2 py-2 sm:px-3 sm:py-3">
-          <div className="flex space-x-2 sm:space-x-3 overflow-x-auto scrollbar-hide">
+        <div className="px-4 py-4">
+          <div className="flex space-x-4 overflow-x-auto scrollbar-hide">
             {/* Your Story */}
             <button
-              className="flex-shrink-0 flex flex-col items-center space-y-1 touch-manipulation"
+              className="flex-shrink-0 flex flex-col items-center space-y-2"
               onClick={onStoryClick}
-              style={{ minWidth: '50px' }}
             >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-0.5">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 p-0.5">
                 <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
-                  <span className="text-white text-lg sm:text-xl font-light">+</span>
+                  <span className="text-white text-2xl font-light">+</span>
                 </div>
               </div>
               <span className="text-white text-xs">Your story</span>
@@ -432,14 +423,13 @@ export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePos
             {stories.map((story) => (
               <button
                 key={story.id}
-                className="flex-shrink-0 flex flex-col items-center space-y-1 touch-manipulation"
+                className="flex-shrink-0 flex flex-col items-center space-y-2"
                 onClick={onStoryClick}
-                style={{ minWidth: '50px' }}
               >
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full p-0.5 ${
+                <div className={`w-16 h-16 rounded-full p-0.5 ${
                   story.isViewed 
                     ? 'bg-gray-600' 
-                    : 'bg-gradient-to-tr from-purple-500 to-pink-500'
+                    : 'bg-gradient-to-tr from-blue-500 to-cyan-500'
                 }`}>
                   <ImageWithFallback
                     src={story.authorAvatar}
@@ -447,7 +437,7 @@ export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePos
                     className="w-full h-full rounded-full object-cover"
                   />
                 </div>
-                <span className="text-white text-xs truncate w-12 sm:w-14 text-center">
+                <span className="text-white text-xs truncate w-16 text-center">
                   {story.author.split('_')[0]}
                 </span>
               </button>
@@ -459,13 +449,9 @@ export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePos
       {/* Main Feed - Scrollable Container */}
       <div 
         ref={containerRef}
-        className="absolute top-16 sm:top-20 left-0 right-0 bottom-0 overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+        className="absolute top-24 left-0 right-0 bottom-0 overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
         onScroll={handleScroll}
-        style={{ 
-          scrollBehavior: 'smooth',
-          touchAction: 'pan-y pinch-zoom',
-          WebkitOverflowScrolling: 'touch'
-        }}
+        style={{ scrollBehavior: 'smooth' }}
       >
         {posts.map((post, index) => (
           <div key={post.id} className="w-full h-full">

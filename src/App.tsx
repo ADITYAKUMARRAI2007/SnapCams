@@ -851,16 +851,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-screen relative overflow-hidden bg-black" style={{
-      height: '100vh',
-      height: '100dvh', // Dynamic viewport height for mobile
-      minHeight: '100vh',
-      minHeight: '100dvh',
-      transform: 'scale(0.95)', // Slight zoom out for better mobile fit
-      transformOrigin: 'top left',
-      width: '105.26%', // Compensate for scale
-      height: '105.26%'
-    }}>
+    <div className="w-full h-screen relative overflow-hidden bg-black">
       {/* Liquid Ether Background for current screen */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
         <LiquidEtherBackground
@@ -882,32 +873,28 @@ export default function App() {
 
       {/* Professional App Header - Hidden on Map */}
       {currentTab !== "map" && (
-        <div className="absolute top-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-md" style={{
-          paddingTop: 'env(safe-area-inset-top, 0px)'
-        }}>
-          <div className="flex items-center justify-between py-2 px-3 sm:py-3 sm:px-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
+        <div className="absolute top-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-md border-b border-white/10">
+          <div className="flex items-center justify-between py-4 px-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">S</span>
               </div>
-              <h1 className="text-white text-base sm:text-lg font-semibold">SnapCap</h1>
+              <h1 className="text-white text-xl font-semibold">SnapCap</h1>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-4">
               <button
                 onClick={() => setCurrentTab("chat")}
-                className="text-white/70 hover:text-white transition-colors p-1 touch-manipulation"
-                style={{ minWidth: '40px', minHeight: '40px' }}
+                className="text-white/70 hover:text-white transition-colors"
               >
-                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                <MessageCircle className="w-6 h-6" />
               </button>
 
               <button
                 onClick={() => setShowSettings(true)}
-                className="text-white/70 hover:text-white transition-colors p-1 touch-manipulation"
-                style={{ minWidth: '40px', minHeight: '40px' }}
+                className="text-white/70 hover:text-white transition-colors"
               >
-                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Settings className="w-6 h-6" />
               </button>
             </div>
           </div>
@@ -916,18 +903,14 @@ export default function App() {
 
       {/* Main Content */}
       <div
-        className={`absolute left-0 right-0 ${
-          currentTab === "map" ? "top-0 bottom-0" : "top-12 bottom-12"
+        className={`absolute left-0 right-0 bottom-16 ${
+          currentTab === "map" ? "top-0" : "top-16"
         }`}
         style={{ 
-          height: currentTab === "map" 
-            ? "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))" 
-            : "calc(100dvh - 48px - 48px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))",
+          height: currentTab === "map" ? "calc(100vh - 64px)" : "calc(100vh - 128px)",
           width: '100%',
           position: 'absolute',
-          zIndex: 10,
-          overflow: 'auto',
-          WebkitOverflowScrolling: 'touch'
+          zIndex: 10
         }}
       >
         {renderCurrentView()}

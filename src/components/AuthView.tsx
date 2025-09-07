@@ -58,10 +58,7 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
   ];
 
   return (
-    <div className="min-h-screen flex bg-black" style={{
-      WebkitOverflowScrolling: 'touch',
-      touchAction: 'pan-y pinch-zoom'
-    }}>
+    <div className="min-h-screen flex bg-black">
       {/* Left Side - Branding & Features */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black" />
@@ -105,10 +102,10 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
       </div>
 
       {/* Right Side - Auth Form */}
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-12 mobile-safe-area">
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md">
           {/* Mobile Branding */}
-          <div className="lg:hidden flex items-center justify-center space-x-3 mb-8 sm:mb-12">
+          <div className="lg:hidden flex items-center justify-center space-x-3 mb-12">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center">
               <span className="text-white font-bold">S</span>
             </div>
@@ -118,27 +115,25 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
           </div>
 
           {/* Tab Switcher */}
-          <div className="bg-gray-900/50 rounded-xl p-1 mb-6 sm:mb-8">
+          <div className="bg-gray-900/50 rounded-xl p-1 mb-8">
             <div className="flex">
               <button
-                className={`flex-1 py-3 px-4 text-sm font-medium rounded-lg transition-all touch-manipulation ${
+                className={`flex-1 py-3 px-4 text-sm font-medium rounded-lg transition-all ${
                   isLogin
                     ? 'bg-white text-black'
                     : 'text-gray-400 hover:text-white'
                 }`}
                 onClick={() => setIsLogin(true)}
-                style={{ minHeight: '44px' }}
               >
                 Log In
               </button>
               <button
-                className={`flex-1 py-3 px-4 text-sm font-medium rounded-lg transition-all touch-manipulation ${
+                className={`flex-1 py-3 px-4 text-sm font-medium rounded-lg transition-all ${
                   !isLogin
                     ? 'bg-white text-black'
                     : 'text-gray-400 hover:text-white'
                 }`}
                 onClick={() => setIsLogin(false)}
-                style={{ minHeight: '44px' }}
               >
                 Sign Up
               </button>

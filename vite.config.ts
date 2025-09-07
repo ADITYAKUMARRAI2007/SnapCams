@@ -54,7 +54,18 @@
     },
     build: {
       target: 'esnext',
-      outDir: 'build',
+      outDir: 'dist',
+      sourcemap: false,
+      minify: 'terser',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            motion: ['motion/react'],
+            ui: ['lucide-react']
+          }
+        }
+      }
     },
     server: {
       port: 3000,

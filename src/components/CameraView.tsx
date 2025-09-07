@@ -28,11 +28,9 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Initialize camera
+  // Initialize camera only when user explicitly requests it
   useEffect(() => {
-    if (!capturedImage) {
-      startCamera();
-    }
+    // Don't auto-start camera, wait for user interaction
     return () => {
       stopCamera();
     };
@@ -41,6 +39,13 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   const startCamera = async () => {
     try {
       setCameraError(null);
+      
+      // Check if we're in a secure context (HTTPS or localhost)
+      if (!window.isSecureContext) {
+        setCameraError('Camera requires HTTPS. Please use file upload or access via HTTPS.');
+        setIsCameraActive(false);
+        return;
+      }
       
       // Check if getUserMedia is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -63,6 +68,16 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        // Add event listeners for debugging
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Camera stream loaded successfully');
+          if (videoRef.current) {
+            videoRef.current.play().catch(console.error);
+          }
+        };
+        videoRef.current.onerror = (error) => {
+          console.error('Video element error:', error);
+        };
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
@@ -70,11 +85,17 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError') {
-          errorMessage = 'Camera access denied. Please allow camera permissions and try again.';
+          errorMessage = 'Camera access denied. Please allow camera permissions in your browser settings and try again.';
         } else if (error.name === 'NotFoundError') {
           errorMessage = 'No camera found. Please connect a camera or use file upload.';
         } else if (error.name === 'NotSupportedError') {
           errorMessage = 'Camera not supported. Please use file upload instead.';
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = 'Camera is being used by another application. Please close other apps and try again.';
+        } else if (error.name === 'OverconstrainedError') {
+          errorMessage = 'Camera constraints cannot be satisfied. Please try again or use file upload.';
+        } else if (error.name === 'SecurityError') {
+          errorMessage = 'Camera access blocked due to security restrictions. Please ensure you are using HTTPS.';
         }
       }
       
@@ -377,10 +398,17 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
                 <div className="w-32 h-32 rounded-full border-4 border-white/20 flex items-center justify-center mb-8">
                   <Camera className="w-16 h-16 text-white/60" />
                 </div>
-                <h2 className="mb-2">Starting Camera...</h2>
+                <h2 className="mb-2">Enable Camera</h2>
                 <p className="text-white/60 text-center px-8 mb-8">
-                  Please allow camera access to capture memories
+                  Click the button below to start your camera and capture memories
                 </p>
+                <Button
+                  onClick={startCamera}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
+                >
+                  <Camera className="w-5 h-5 mr-2" />
+                  Start Camera
+                </Button>
               </div>
             )}
           </div>

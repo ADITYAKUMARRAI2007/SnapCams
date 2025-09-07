@@ -26,6 +26,7 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [cameraRequested, setCameraRequested] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(true);
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -73,29 +74,43 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       // Try with ideal constraints first
       let mediaStream;
       try {
+        console.log(`Requesting camera with facingMode: ${facingMode}`);
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: facingMode,
+            facingMode: { exact: facingMode },
             width: { ideal: 1280 },
             height: { ideal: 720 }
           },
           audio: false
         });
+        console.log(`Successfully got camera with facingMode: ${facingMode}`);
       } catch (error) {
-        // Fallback to basic constraints if ideal fails
         console.log('Trying fallback camera constraints...');
         try {
+          // Try with ideal facingMode (less strict)
           mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: {
+              facingMode: facingMode,
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
             audio: false
           });
         } catch (fallbackError) {
-          console.log('Trying minimal camera constraints for Netlify...');
-          // Final fallback for Netlify
-          mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' },
-            audio: false
-          });
+          console.log('Trying basic camera constraints...');
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false
+            });
+          } catch (finalError) {
+            console.log('Trying minimal camera constraints...');
+            // Final fallback
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'user' },
+              audio: false
+            });
+          }
         }
       }
       
@@ -150,8 +165,24 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     }
   };
 
-  const switchCamera = () => {
-    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+  const switchCamera = async () => {
+    setIsSwitchingCamera(true);
+    
+    // Stop current camera first
+    stopCamera();
+    
+    // Wait a moment for cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Switch facing mode
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+    
+    // Restart camera with new facing mode
+    setTimeout(async () => {
+      await startCamera();
+      setIsSwitchingCamera(false);
+    }, 200);
   };
 
   // Mock AI caption generation
@@ -311,7 +342,9 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     isCameraActive, 
     cameraError, 
     cameraRequested,
-    isStartingCamera
+    isStartingCamera,
+    isSwitchingCamera,
+    facingMode
   });
 
   return (
@@ -401,15 +434,29 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
               className="w-full h-full object-cover"
             />
             {/* Camera Controls Overlay */}
-            <div className="absolute top-4 right-4">
+            <div className="absolute top-4 right-4 flex flex-col gap-2">
               <Button
                 variant="outline"
                 size="icon"
                 onClick={switchCamera}
-                className="w-10 h-10 rounded-full border-white/30 text-white hover:bg-white/10 bg-black/50"
+                disabled={isSwitchingCamera}
+                className="w-10 h-10 rounded-full border-white/30 text-white hover:bg-white/10 bg-black/50 disabled:opacity-50"
+                title={`Switch to ${facingMode === 'user' ? 'back' : 'front'} camera`}
               >
-                <RotateCcw className="w-5 h-5" />
+                {isSwitchingCamera ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                  </motion.div>
+                ) : (
+                  <RotateCcw className="w-5 h-5" />
+                )}
               </Button>
+              <div className="text-xs text-white/70 bg-black/50 px-2 py-1 rounded">
+                {facingMode === 'user' ? 'Front' : 'Back'}
+              </div>
             </div>
             {/* Hidden canvas for capturing */}
             <canvas ref={canvasRef} className="hidden" />

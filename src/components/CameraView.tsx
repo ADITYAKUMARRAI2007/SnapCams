@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Camera, X, Sparkles, MapPin, Send, Zap, Music, Play, Pause } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, X, Sparkles, MapPin, Send, Zap, Music, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -20,7 +20,80 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [showMusicSelector, setShowMusicSelector] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<any>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Initialize camera
+  useEffect(() => {
+    if (!capturedImage) {
+      startCamera();
+    }
+    return () => {
+      stopCamera();
+    };
+  }, [facingMode, capturedImage]);
+
+  const startCamera = async () => {
+    try {
+      setCameraError(null);
+      
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError('Camera not supported in this browser. Please use file upload instead.');
+        setIsCameraActive(false);
+        return;
+      }
+      
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+      
+      setStream(mediaStream);
+      setIsCameraActive(true);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      let errorMessage = 'Unable to access camera. Please check permissions.';
+      
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          errorMessage = 'Camera access denied. Please allow camera permissions and try again.';
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = 'No camera found. Please connect a camera or use file upload.';
+        } else if (error.name === 'NotSupportedError') {
+          errorMessage = 'Camera not supported. Please use file upload instead.';
+        }
+      }
+      
+      setCameraError(errorMessage);
+      setIsCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      setIsCameraActive(false);
+    }
+  };
+
+  const switchCamera = () => {
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+  };
 
   // Mock AI caption generation
   const generateCaption = async () => {
@@ -50,9 +123,29 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   };
 
   const handleCapture = () => {
-    // Mock camera capture - in real app would use camera API
-    const mockImage = "https://images.unsplash.com/photo-1708352012139-cc209d6f479e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx1cmJhbiUyMHN0cmVldCUyMHBob3RvZ3JhcGh5fGVufDF8fHx8MTc1Njg5NzMzN3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral";
-    setCapturedImage(mockImage);
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    
+    if (!context) return;
+    
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw the current video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Convert canvas to data URL
+    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+    setCapturedImage(imageDataUrl);
+    
+    // Stop camera after capture
+    stopCamera();
+    
+    // Generate AI caption
     generateCaption();
   };
 
@@ -61,6 +154,8 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     if (file) {
       const url = URL.createObjectURL(file);
       setCapturedImage(url);
+      // Stop camera when using file upload
+      stopCamera();
       generateCaption();
     }
   };
@@ -81,21 +176,22 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   };
 
   const handleStoryPost = async () => {
-    if (!capturedImage || !onStoryUpload) return;
+    if (!capturedImage) return;
     
     // Show music selector for stories
     setShowMusicSelector(true);
   };
 
   const handleStoryWithMusic = async () => {
+    if (!capturedImage || !onStoryUpload) return;
+    
     setIsUploading(true);
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     onStoryUpload({
       image: capturedImage,
       caption: generatedCaption,
-      hashtags: generatedHashtags,
-      music: selectedMusic
+      hashtags: generatedHashtags
     });
     
     setIsUploading(false);
@@ -228,14 +324,65 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
             )}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-white">
-            <div className="w-32 h-32 rounded-full border-4 border-white/20 flex items-center justify-center mb-8">
-              <Camera className="w-16 h-16 text-white/60" />
-            </div>
-            <h2 className="mb-2">Capture a Memory</h2>
-            <p className="text-white/60 text-center px-8 mb-8">
-              Let AI help you turn any moment into a captioned memory with perfect hashtags
-            </p>
+          <div className="w-full h-full relative">
+            {cameraError ? (
+              <div className="flex flex-col items-center justify-center h-full text-white">
+                <div className="w-32 h-32 rounded-full border-4 border-red-500/20 flex items-center justify-center mb-8">
+                  <Camera className="w-16 h-16 text-red-500/60" />
+                </div>
+                <h2 className="mb-2 text-red-400">Camera Error</h2>
+                <p className="text-white/60 text-center px-8 mb-8">
+                  {cameraError}
+                </p>
+                <div className="flex space-x-4">
+                  <Button
+                    onClick={startCamera}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Try Again
+                  </Button>
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    Upload Photo
+                  </Button>
+                </div>
+              </div>
+            ) : isCameraActive ? (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+                {/* Camera Controls Overlay */}
+                <div className="absolute top-4 right-4">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={switchCamera}
+                    className="w-10 h-10 rounded-full border-white/30 text-white hover:bg-white/10 bg-black/50"
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                  </Button>
+                </div>
+                {/* Hidden canvas for capturing */}
+                <canvas ref={canvasRef} className="hidden" />
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-white">
+                <div className="w-32 h-32 rounded-full border-4 border-white/20 flex items-center justify-center mb-8">
+                  <Camera className="w-16 h-16 text-white/60" />
+                </div>
+                <h2 className="mb-2">Starting Camera...</h2>
+                <p className="text-white/60 text-center px-8 mb-8">
+                  Please allow camera access to capture memories
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -287,6 +434,10 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
                   setGeneratedCaption('');
                   setGeneratedHashtags([]);
                   setShowShareOptions(false);
+                  setShowMusicSelector(false);
+                  setSelectedMusic(null);
+                  // Restart camera for retake
+                  startCamera();
                 }}
                 className="border-white/30 text-white hover:bg-white/10"
               >

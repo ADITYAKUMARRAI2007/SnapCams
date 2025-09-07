@@ -24,13 +24,15 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [cameraRequested, setCameraRequested] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Initialize camera only when user explicitly requests it
+  // Auto-start camera when component mounts
   useEffect(() => {
-    // Don't auto-start camera, wait for user interaction
+    startCamera();
     return () => {
       stopCamera();
     };
@@ -39,11 +41,14 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   const startCamera = async () => {
     try {
       setCameraError(null);
+      setCameraRequested(true);
+      setIsStartingCamera(true);
       
       // Check if we're in a secure context (HTTPS or localhost)
       if (!window.isSecureContext) {
         setCameraError('Camera requires HTTPS. Please use file upload or access via HTTPS.');
         setIsCameraActive(false);
+        setIsStartingCamera(false);
         return;
       }
       
@@ -54,17 +59,29 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
         return;
       }
       
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
+      // Try with ideal constraints first
+      let mediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+      } catch (error) {
+        // Fallback to basic constraints if ideal fails
+        console.log('Trying fallback camera constraints...');
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
       
       setStream(mediaStream);
       setIsCameraActive(true);
+      setIsStartingCamera(false);
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -101,6 +118,7 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       
       setCameraError(errorMessage);
       setIsCameraActive(false);
+      setIsStartingCamera(false);
     }
   };
 
@@ -267,6 +285,15 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     }
   };
 
+  // Debug log
+  console.log('CameraView render:', { 
+    capturedImage: !!capturedImage, 
+    isCameraActive, 
+    cameraError, 
+    cameraRequested,
+    isStartingCamera
+  });
+
   return (
     <motion.div
       className="fixed inset-0 bg-black z-50 flex flex-col"
@@ -344,73 +371,93 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
               </motion.div>
             )}
           </div>
+        ) : isCameraActive ? (
+          <>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            {/* Camera Controls Overlay */}
+            <div className="absolute top-4 right-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={switchCamera}
+                className="w-10 h-10 rounded-full border-white/30 text-white hover:bg-white/10 bg-black/50"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </Button>
+            </div>
+            {/* Hidden canvas for capturing */}
+            <canvas ref={canvasRef} className="hidden" />
+          </>
+        ) : cameraError ? (
+          <div className="flex flex-col items-center justify-center h-full text-white">
+            <div className="w-32 h-32 rounded-full border-4 border-red-500/20 flex items-center justify-center mb-8">
+              <Camera className="w-16 h-16 text-red-500/60" />
+            </div>
+            <h2 className="mb-2 text-red-400">Camera Error</h2>
+            <p className="text-white/60 text-center px-8 mb-8">
+              {cameraError}
+            </p>
+            <div className="flex space-x-4">
+              <Button
+                onClick={startCamera}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Try Again
+              </Button>
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Upload Photo
+              </Button>
+            </div>
+          </div>
+        ) : isStartingCamera ? (
+          <div className="flex flex-col items-center justify-center h-full text-white">
+            <div className="w-32 h-32 rounded-full border-4 border-white/20 flex items-center justify-center mb-8">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              >
+                <Camera className="w-16 h-16 text-white/60" />
+              </motion.div>
+            </div>
+            <h2 className="mb-2">🎥 Starting Camera...</h2>
+            <p className="text-white/60 text-center px-8 mb-8">
+              Please allow camera access to continue
+            </p>
+            <div className="mt-6">
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 text-sm"
+              >
+                📁 Upload Photo Instead
+              </Button>
+            </div>
+          </div>
         ) : (
-          <div className="w-full h-full relative">
-            {cameraError ? (
-              <div className="flex flex-col items-center justify-center h-full text-white">
-                <div className="w-32 h-32 rounded-full border-4 border-red-500/20 flex items-center justify-center mb-8">
-                  <Camera className="w-16 h-16 text-red-500/60" />
-                </div>
-                <h2 className="mb-2 text-red-400">Camera Error</h2>
-                <p className="text-white/60 text-center px-8 mb-8">
-                  {cameraError}
-                </p>
-                <div className="flex space-x-4">
-                  <Button
-                    onClick={startCamera}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Try Again
-                  </Button>
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    Upload Photo
-                  </Button>
-                </div>
-              </div>
-            ) : isCameraActive ? (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-                {/* Camera Controls Overlay */}
-                <div className="absolute top-4 right-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={switchCamera}
-                    className="w-10 h-10 rounded-full border-white/30 text-white hover:bg-white/10 bg-black/50"
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                  </Button>
-                </div>
-                {/* Hidden canvas for capturing */}
-                <canvas ref={canvasRef} className="hidden" />
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-white">
-                <div className="w-32 h-32 rounded-full border-4 border-white/20 flex items-center justify-center mb-8">
-                  <Camera className="w-16 h-16 text-white/60" />
-                </div>
-                <h2 className="mb-2">Enable Camera</h2>
-                <p className="text-white/60 text-center px-8 mb-8">
-                  Click the button below to start your camera and capture memories
-                </p>
-                <Button
-                  onClick={startCamera}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
-                >
-                  <Camera className="w-5 h-5 mr-2" />
-                  Start Camera
-                </Button>
-              </div>
-            )}
+          <div className="flex flex-col items-center justify-center h-full text-white">
+            <div className="w-32 h-32 rounded-full border-4 border-white/20 flex items-center justify-center mb-8">
+              <Camera className="w-16 h-16 text-white/60" />
+            </div>
+            <h2 className="mb-2">🎥 Camera Ready</h2>
+            <p className="text-white/60 text-center px-8 mb-8">
+              Camera is ready to use
+            </p>
+            <div className="mt-6">
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 text-sm"
+              >
+                📁 Upload Photo Instead
+              </Button>
+            </div>
           </div>
         )}
       </div>

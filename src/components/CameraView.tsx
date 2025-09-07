@@ -27,14 +27,28 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   const [cameraRequested, setCameraRequested] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(true);
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Detect available cameras
+  const detectCameras = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter(device => device.kind === 'videoinput');
+      setAvailableCameras(cameras);
+      console.log('Available cameras:', cameras.map(c => ({ label: c.label, deviceId: c.deviceId })));
+    } catch (error) {
+      console.error('Error detecting cameras:', error);
+    }
+  };
+
   // Auto-start camera when component mounts
   useEffect(() => {
     // Add a small delay to ensure component is fully mounted
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      await detectCameras();
       startCamera();
     }, 100);
     
@@ -71,45 +85,61 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
         return;
       }
       
-      // Try with ideal constraints first
+      // Try multiple camera constraint strategies
       let mediaStream;
-      try {
-        console.log(`Requesting camera with facingMode: ${facingMode}`);
-        mediaStream = await navigator.mediaDevices.getUserMedia({
+      const constraints = [
+        // Strategy 1: Exact facingMode with high quality
+        {
+          video: {
+            facingMode: { exact: facingMode },
+            width: { ideal: 1920, min: 640 },
+            height: { ideal: 1080, min: 480 },
+            frameRate: { ideal: 30, min: 15 }
+          },
+          audio: false
+        },
+        // Strategy 2: Exact facingMode with medium quality
+        {
           video: {
             facingMode: { exact: facingMode },
             width: { ideal: 1280 },
             height: { ideal: 720 }
           },
           audio: false
-        });
-        console.log(`Successfully got camera with facingMode: ${facingMode}`);
-      } catch (error) {
-        console.log('Trying fallback camera constraints...');
+        },
+        // Strategy 3: Ideal facingMode (less strict)
+        {
+          video: {
+            facingMode: facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        },
+        // Strategy 4: Basic facingMode
+        {
+          video: {
+            facingMode: facingMode
+          },
+          audio: false
+        },
+        // Strategy 5: Any camera
+        {
+          video: true,
+          audio: false
+        }
+      ];
+
+      for (let i = 0; i < constraints.length; i++) {
         try {
-          // Try with ideal facingMode (less strict)
-          mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: facingMode,
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            },
-            audio: false
-          });
-        } catch (fallbackError) {
-          console.log('Trying basic camera constraints...');
-          try {
-            mediaStream = await navigator.mediaDevices.getUserMedia({
-              video: true,
-              audio: false
-            });
-          } catch (finalError) {
-            console.log('Trying minimal camera constraints...');
-            // Final fallback
-            mediaStream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: 'user' },
-              audio: false
-            });
+          console.log(`Trying camera constraint strategy ${i + 1} for ${facingMode}:`, constraints[i]);
+          mediaStream = await navigator.mediaDevices.getUserMedia(constraints[i]);
+          console.log(`✅ Successfully got camera with strategy ${i + 1} for ${facingMode}`);
+          break;
+        } catch (error) {
+          console.log(`❌ Strategy ${i + 1} failed:`, error.name, error.message);
+          if (i === constraints.length - 1) {
+            throw error; // Re-throw the last error
           }
         }
       }
@@ -166,23 +196,41 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   };
 
   const switchCamera = async () => {
+    if (isSwitchingCamera) return; // Prevent multiple simultaneous switches
+    
     setIsSwitchingCamera(true);
+    setIsCameraActive(false);
     
-    // Stop current camera first
-    stopCamera();
-    
-    // Wait a moment for cleanup
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Switch facing mode
-    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
-    setFacingMode(newFacingMode);
-    
-    // Restart camera with new facing mode
-    setTimeout(async () => {
+    try {
+      // Stop current camera completely
+      if (stream) {
+        stream.getTracks().forEach(track => {
+          track.stop();
+          console.log('Stopped track:', track.label);
+        });
+        setStream(null);
+      }
+      
+      // Wait for complete cleanup
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Switch facing mode
+      const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+      console.log(`Switching from ${facingMode} to ${newFacingMode}`);
+      setFacingMode(newFacingMode);
+      
+      // Wait for state update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Start new camera
       await startCamera();
+      
+    } catch (error) {
+      console.error('Error switching camera:', error);
+      setCameraError('Failed to switch camera. Please try again.');
+    } finally {
       setIsSwitchingCamera(false);
-    }, 200);
+    }
   };
 
   // Mock AI caption generation
@@ -457,6 +505,11 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
               <div className="text-xs text-white/70 bg-black/50 px-2 py-1 rounded">
                 {facingMode === 'user' ? 'Front' : 'Back'}
               </div>
+              {availableCameras.length > 1 && (
+                <div className="text-xs text-white/50 bg-black/30 px-2 py-1 rounded">
+                  {availableCameras.length} cameras
+                </div>
+              )}
             </div>
             {/* Hidden canvas for capturing */}
             <canvas ref={canvasRef} className="hidden" />

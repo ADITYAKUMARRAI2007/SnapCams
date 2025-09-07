@@ -10,11 +10,11 @@
       <meta name="apple-mobile-web-app-title" content="SnapCap" />
       
       <!-- Camera Permissions -->
-      <meta http-equiv="Permissions-Policy" content="camera=*" />
+      <meta http-equiv="Permissions-Policy" content="camera=*, microphone=*, geolocation=*" />
       <meta name="referrer" content="strict-origin-when-cross-origin" />
       
       <!-- Security Headers for Camera Access -->
-      <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: data:; connect-src 'self' https:; camera 'self' *; microphone 'self' *;" />
+      <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: data:; connect-src 'self' https:; camera *; microphone *;" />
       
       <title>AI Social Inspiration App</title>
     </head>

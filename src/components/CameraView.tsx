@@ -32,8 +32,13 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
 
   // Auto-start camera when component mounts
   useEffect(() => {
-    startCamera();
+    // Add a small delay to ensure component is fully mounted
+    const timer = setTimeout(() => {
+      startCamera();
+    }, 100);
+    
     return () => {
+      clearTimeout(timer);
       stopCamera();
     };
   }, [facingMode, capturedImage]);
@@ -50,6 +55,12 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
         setIsCameraActive(false);
         setIsStartingCamera(false);
         return;
+      }
+      
+      // Check if we're on Netlify and add specific handling
+      const isNetlify = window.location.hostname.includes('netlify.app');
+      if (isNetlify) {
+        console.log('Running on Netlify - applying specific camera handling');
       }
       
       // Check if getUserMedia is available
@@ -73,10 +84,19 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       } catch (error) {
         // Fallback to basic constraints if ideal fails
         console.log('Trying fallback camera constraints...');
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false
-        });
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+        } catch (fallbackError) {
+          console.log('Trying minimal camera constraints for Netlify...');
+          // Final fallback for Netlify
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: false
+          });
+        }
       }
       
       setStream(mediaStream);

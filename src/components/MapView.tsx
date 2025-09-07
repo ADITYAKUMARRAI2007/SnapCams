@@ -375,7 +375,10 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
   };
 
   return (
-    <div className="w-full h-full relative overflow-hidden">
+    <div className="w-full h-full relative overflow-hidden" style={{
+      WebkitOverflowScrolling: 'touch',
+      touchAction: 'pan-y pinch-zoom'
+    }}>
       {/* Google Maps Container */}
       <div 
         ref={mapRef}

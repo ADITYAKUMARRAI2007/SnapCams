@@ -48,7 +48,10 @@ export function ProfileView({ stats, posts, savedPosts, onCameraClick, onLogout,
   };
 
   return (
-    <div className="w-full h-full bg-black overflow-y-auto scrollbar-hide">
+    <div className="w-full h-full bg-black overflow-y-auto scrollbar-hide" style={{
+      WebkitOverflowScrolling: 'touch',
+      touchAction: 'pan-y pinch-zoom'
+    }}>
       <div className="p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

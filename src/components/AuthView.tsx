@@ -58,7 +58,10 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
   ];
 
   return (
-    <div className="min-h-screen flex bg-black">
+    <div className="min-h-screen flex bg-black" style={{
+      WebkitOverflowScrolling: 'touch',
+      touchAction: 'pan-y pinch-zoom'
+    }}>
       {/* Left Side - Branding & Features */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black" />

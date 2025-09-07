@@ -261,7 +261,10 @@ export function ChatView({ onBack, onOpenIndividualChat }: ChatViewProps) {
   }
 
   return (
-    <div className="w-full h-full relative overflow-hidden">
+    <div className="w-full h-full relative overflow-hidden" style={{
+      WebkitOverflowScrolling: 'touch',
+      touchAction: 'pan-y pinch-zoom'
+    }}>
       <LiquidEtherBackground variant="chat" />
       
       {/* Header */}

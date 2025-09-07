@@ -171,7 +171,10 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
   );
 
   return (
-    <div className="w-full h-full relative overflow-hidden">
+    <div className="w-full h-full relative overflow-hidden" style={{
+      WebkitOverflowScrolling: 'touch',
+      touchAction: 'pan-y pinch-zoom'
+    }}>
       {/* Liquid Ether Background */}
       <LiquidEtherBackground variant="profile" />
       

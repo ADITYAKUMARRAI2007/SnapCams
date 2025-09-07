@@ -851,7 +851,12 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-screen relative overflow-hidden bg-black">
+    <div className="w-full h-screen relative overflow-hidden bg-black" style={{
+      height: '100vh',
+      height: '100dvh', // Dynamic viewport height for mobile
+      minHeight: '100vh',
+      minHeight: '100dvh'
+    }}>
       {/* Liquid Ether Background for current screen */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
         <LiquidEtherBackground
@@ -873,28 +878,32 @@ export default function App() {
 
       {/* Professional App Header - Hidden on Map */}
       {currentTab !== "map" && (
-        <div className="absolute top-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-md border-b border-white/10">
-          <div className="flex items-center justify-between py-4 px-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center">
-                <span className="text-white font-bold text-lg">S</span>
+        <div className="absolute top-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-md border-b border-white/10" style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)'
+        }}>
+          <div className="flex items-center justify-between py-3 px-4 sm:py-4 sm:px-6">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center">
+                <span className="text-white font-bold text-sm sm:text-lg">S</span>
               </div>
-              <h1 className="text-white text-xl font-semibold">SnapCap</h1>
+              <h1 className="text-white text-lg sm:text-xl font-semibold">SnapCap</h1>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 sm:space-x-4">
               <button
                 onClick={() => setCurrentTab("chat")}
-                className="text-white/70 hover:text-white transition-colors"
+                className="text-white/70 hover:text-white transition-colors p-2 -m-2 touch-manipulation"
+                style={{ minWidth: '44px', minHeight: '44px' }}
               >
-                <MessageCircle className="w-6 h-6" />
+                <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
 
               <button
                 onClick={() => setShowSettings(true)}
-                className="text-white/70 hover:text-white transition-colors"
+                className="text-white/70 hover:text-white transition-colors p-2 -m-2 touch-manipulation"
+                style={{ minWidth: '44px', minHeight: '44px' }}
               >
-                <Settings className="w-6 h-6" />
+                <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
           </div>
@@ -903,11 +912,13 @@ export default function App() {
 
       {/* Main Content */}
       <div
-        className={`absolute left-0 right-0 bottom-16 ${
-          currentTab === "map" ? "top-0" : "top-16"
+        className={`absolute left-0 right-0 ${
+          currentTab === "map" ? "top-0 bottom-0" : "top-16 bottom-16"
         }`}
         style={{ 
-          height: currentTab === "map" ? "calc(100vh - 64px)" : "calc(100vh - 128px)",
+          height: currentTab === "map" 
+            ? "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))" 
+            : "calc(100dvh - 64px - 64px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))",
           width: '100%',
           position: 'absolute',
           zIndex: 10

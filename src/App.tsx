@@ -120,6 +120,7 @@ export default function App() {
   const [shareContent, setShareContent] = useState<ShareContent | null>(null);
   const [selectedChatUser, setSelectedChatUser] = useState<AppUser | null>(null);
   const [selectedProfileUser, setSelectedProfileUser] = useState<AppUser | null>(null);
+  const [previousModal, setPreviousModal] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<AppUser>({
     id: "you",
     username: "you",
@@ -619,22 +620,47 @@ export default function App() {
   const handleMessageFriend = (friendId: string) => {
     const chatUser = sampleUsers.find((u) => u.id === friendId);
     if (chatUser) {
-      setSelectedChatUser(chatUser);
-      setShowIndividualChat(true);
+      // Track which modal was open before opening chat
+      if (showFollowersModal) {
+        setPreviousModal('followers');
+      } else if (showOtherProfile) {
+        setPreviousModal('profile');
+      } else {
+        setPreviousModal(null);
+      }
+      
+      // Close any open modals first with a small delay for smooth transition
+      setShowFollowersModal(false);
+      setShowOtherProfile(false);
+      
+      // Small delay to allow modal close animation before opening chat
+      setTimeout(() => {
+        setSelectedChatUser(chatUser);
+        setShowIndividualChat(true);
+      }, 150);
     }
   };
 
   const handleViewProfile = (userId: string) => {
     const profileUser = sampleUsers.find((u) => u.id === userId);
     if (profileUser) {
-      setSelectedProfileUser(profileUser);
-      setShowOtherProfile(true);
+      // Close followers modal if open with smooth transition
+      setShowFollowersModal(false);
+      
+      // Small delay to allow modal close animation before opening profile
+      setTimeout(() => {
+        setSelectedProfileUser(profileUser);
+        setShowOtherProfile(true);
+      }, 150);
     }
   };
 
   const handleFollowUser = (userId: string) => {
     console.log("Following user:", userId);
-    // Update user following status
+    // Update the selected profile user's follow status
+    if (selectedProfileUser && selectedProfileUser.id === userId) {
+      setSelectedProfileUser(prev => prev ? { ...prev, isFollowing: !prev.isFollowing } : null);
+    }
   };
 
   const handleShareProfile = (userId: string) => {
@@ -652,6 +678,8 @@ export default function App() {
 
   const handleFollow = (userId: string) => {
     console.log("Following user:", userId);
+    // In a real app, this would update the backend
+    // For now, just log the action
   };
 
   const handleSavePost = (postId: string) => {
@@ -838,6 +866,10 @@ export default function App() {
             onLike={handleLike}
             onComment={handleComment}
             onDuet={handleDuet}
+            onFollow={handleFollow}
+            onSavePost={handleSavePost}
+            onSharePost={handleSharePost}
+            onViewProfile={handleViewProfile}
             stories={stories}
             onStoryClick={() => setShowStories(true)}
           />
@@ -1051,14 +1083,14 @@ export default function App() {
       <AnimatePresence>
         {showIndividualChat && selectedChatUser && (
           <motion.div
-            className="absolute inset-0 z-50"
+            className="absolute inset-0 z-[60]"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{
               type: "spring",
-              damping: 20,
-              stiffness: 300,
+              damping: 25,
+              stiffness: 400,
             }}
           >
             <IndividualChatView
@@ -1066,6 +1098,19 @@ export default function App() {
               onBack={() => {
                 setShowIndividualChat(false);
                 setSelectedChatUser(null);
+                
+                // Restore previous modal if it existed
+                if (previousModal === 'followers') {
+                  setTimeout(() => {
+                    setShowFollowersModal(true);
+                    setPreviousModal(null);
+                  }, 150);
+                } else if (previousModal === 'profile') {
+                  setTimeout(() => {
+                    setShowOtherProfile(true);
+                    setPreviousModal(null);
+                  }, 150);
+                }
               }}
               onViewProfile={handleViewProfile}
             />
@@ -1083,8 +1128,8 @@ export default function App() {
             exit={{ x: "100%" }}
             transition={{
               type: "spring",
-              damping: 20,
-              stiffness: 300,
+              damping: 25,
+              stiffness: 400,
             }}
           >
             <OtherProfileView

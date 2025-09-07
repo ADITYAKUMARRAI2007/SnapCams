@@ -28,6 +28,16 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
   const [isStartingCamera, setIsStartingCamera] = useState(true);
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [cameraMode, setCameraMode] = useState<'photo' | 'story'>('story');
+  const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
+  const [showEffects, setShowEffects] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
+  const [storyImages, setStoryImages] = useState<string[]>([]);
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -282,6 +292,128 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     }
   };
 
+  // Handle camera mode changes
+  const handleModeChange = (mode: 'photo' | 'story') => {
+    setCameraMode(mode);
+    console.log(`Switched to ${mode} mode`);
+    
+    // Reset story when switching modes
+    if (mode === 'photo') {
+      setStoryImages([]);
+      setCurrentStoryIndex(0);
+    }
+  };
+
+  // Handle flash mode toggle
+  const toggleFlash = () => {
+    const modes: ('off' | 'on' | 'auto')[] = ['off', 'on', 'auto'];
+    const currentIndex = modes.indexOf(flashMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    setFlashMode(modes[nextIndex]);
+    console.log(`Flash mode: ${modes[nextIndex]}`);
+  };
+
+  // Handle effects toggle
+  const toggleEffects = () => {
+    setShowEffects(!showEffects);
+    console.log(`Effects panel: ${!showEffects ? 'open' : 'closed'}`);
+  };
+
+  // Handle grid toggle
+  const toggleGrid = () => {
+    setShowGrid(!showGrid);
+    console.log(`Grid: ${!showGrid ? 'on' : 'off'}`);
+  };
+
+  // Handle story capture
+  const handleStoryCapture = () => {
+    if (cameraMode === 'story') {
+      console.log('Capturing story image...');
+      // Capture image for story
+      handleCapture();
+    }
+  };
+
+  // Handle story actions
+  const handleStorySave = () => {
+    if (storyImages.length > 0) {
+      console.log('Saving story...');
+      alert(`Story saved with ${storyImages.length} images!`);
+      setStoryImages([]);
+      setCurrentStoryIndex(0);
+    }
+  };
+
+  const handleStoryShare = () => {
+    if (storyImages.length > 0) {
+      console.log('Sharing story...');
+      alert(`Story shared with ${storyImages.length} images!`);
+    }
+  };
+
+  const handleStoryAddMore = () => {
+    console.log('Adding more to story...');
+    // Start camera again for more captures
+    if (!isCameraActive) {
+      startCamera();
+    }
+  };
+
+  const handleStoryRemoveImage = (index: number) => {
+    const newImages = storyImages.filter((_, i) => i !== index);
+    setStoryImages(newImages);
+    if (currentStoryIndex >= newImages.length) {
+      setCurrentStoryIndex(Math.max(0, newImages.length - 1));
+    }
+  };
+
+  // Audio recording functions
+  const startAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        setAudioBlob(blob);
+        setAudioUrl(url);
+        console.log('Audio recording stopped');
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecordingAudio(true);
+      console.log('Audio recording started');
+    } catch (error) {
+      console.error('Error starting audio recording:', error);
+    }
+  };
+
+  const stopAudioRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      setMediaRecorder(null);
+      setIsRecordingAudio(false);
+      console.log('Audio recording stopped');
+    }
+  };
+
+  const toggleAudioRecording = () => {
+    if (isRecordingAudio) {
+      stopAudioRecording();
+    } else {
+      startAudioRecording();
+    }
+  };
+
   // Mock AI caption generation
   const generateCaption = async () => {
     setIsGeneratingCaption(true);
@@ -327,13 +459,13 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     
     // Convert canvas to data URL
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-    setCapturedImage(imageDataUrl);
     
-    // Stop camera after capture
-    stopCamera();
+    // Always add to story images (Instagram style)
+    setStoryImages(prev => [...prev, imageDataUrl]);
+    setCurrentStoryIndex(storyImages.length);
+    console.log(`Added image to story. Total: ${storyImages.length + 1}`);
     
-    // Generate AI caption
-    generateCaption();
+    // Don't stop camera for story mode - keep it running for multiple captures
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -451,29 +583,126 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 text-white bg-gradient-to-r from-black/80 to-transparent backdrop-blur-sm">
+      {/* Header - Instagram/Snapchat Style */}
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 text-white">
         <Button
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="w-10 h-10 rounded-full hover:bg-white/10 transition-all duration-200"
+          className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md hover:bg-black/50 transition-all duration-200"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </Button>
-        <div className="text-center">
-          <h1 className="font-semibold text-lg">Create Memory</h1>
-          <p className="text-xs text-white/60">Capture your moment</p>
+        
+        <div className="flex items-center space-x-4">
+          {/* Story Counter */}
+          {storyImages.length > 0 && (
+            <div className="bg-black/30 backdrop-blur-md rounded-full px-3 py-1">
+              <span className="text-white text-sm font-medium">
+                {storyImages.length} image{storyImages.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-xs text-white/60">Live</span>
-        </div>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleFlash}
+          className={`w-10 h-10 rounded-full backdrop-blur-md hover:bg-black/50 transition-all duration-200 ${
+            flashMode === 'off' ? 'bg-black/30' : 
+            flashMode === 'on' ? 'bg-yellow-500/80' : 'bg-blue-500/80'
+          }`}
+          title={`Flash: ${flashMode.toUpperCase()}`}
+        >
+          <Zap className={`w-5 h-5 ${flashMode === 'off' ? 'text-white' : 'text-white'}`} />
+        </Button>
       </div>
 
       {/* Camera/Preview Area */}
       <div className="flex-1 relative bg-gray-900 overflow-hidden">
-        {capturedImage ? (
+        {storyImages.length > 0 ? (
+          <div className="w-full h-full relative">
+            <ImageWithFallback
+              src={storyImages[currentStoryIndex]}
+              alt="Story"
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Story Progress Bars - Instagram Style */}
+            <div className="absolute top-4 left-4 right-4 flex space-x-1">
+              {storyImages.map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-1 rounded-full transition-all duration-200 ${
+                    index === currentStoryIndex ? 'bg-white' : 'bg-white/30'
+                  }`}
+                  style={{ flex: 1 }}
+                />
+              ))}
+            </div>
+            
+            {/* Story Navigation */}
+            <div className="absolute top-4 right-4 flex items-center space-x-2">
+              <Button
+                onClick={() => handleStoryRemoveImage(currentStoryIndex)}
+                className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-md hover:bg-black/70"
+              >
+                <X className="w-4 h-4 text-white" />
+              </Button>
+            </div>
+            
+            {/* Audio Controls - Instagram Style */}
+            <div className="absolute top-20 right-4 flex flex-col space-y-2">
+              <Button
+                onClick={toggleAudioRecording}
+                className={`w-12 h-12 rounded-full backdrop-blur-md transition-all duration-200 ${
+                  isRecordingAudio 
+                    ? 'bg-red-500/80 hover:bg-red-600/80' 
+                    : 'bg-black/50 hover:bg-black/70'
+                }`}
+              >
+                {isRecordingAudio ? (
+                  <div className="w-6 h-6 bg-white rounded-full animate-pulse" />
+                ) : (
+                  <div className="w-6 h-6 bg-white rounded-full" />
+                )}
+              </Button>
+              {audioUrl && (
+                <audio
+                  src={audioUrl}
+                  controls
+                  className="w-12 h-8 bg-black/50 backdrop-blur-md rounded"
+                />
+              )}
+            </div>
+            
+            {/* Story Action Buttons - Instagram Style */}
+            <div className="absolute bottom-4 left-4 right-4 flex justify-center space-x-4">
+              <Button
+                onClick={handleStoryAddMore}
+                className="bg-white/20 backdrop-blur-md hover:bg-white/30 text-white px-6 py-2 rounded-full border border-white/20"
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Add More
+              </Button>
+              <Button
+                onClick={handleStorySave}
+                className="bg-white/20 backdrop-blur-md hover:bg-white/30 text-white px-6 py-2 rounded-full border border-white/20"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Save Story
+              </Button>
+              <Button
+                onClick={handleStoryShare}
+                className="bg-white/20 backdrop-blur-md hover:bg-white/30 text-white px-6 py-2 rounded-full border border-white/20"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Share
+              </Button>
+            </div>
+          </div>
+        ) : capturedImage ? (
           <div className="w-full h-full relative">
             <ImageWithFallback
               src={capturedImage}
@@ -543,40 +772,101 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
                 backgroundColor: '#000'
               }}
             />
-            {/* Camera Controls Overlay */}
-            <div className="absolute top-4 right-4 flex flex-col gap-3">
-              <div className="flex flex-col items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={switchCamera}
-                  disabled={isSwitchingCamera}
-                  className="w-12 h-12 rounded-full border-white/20 text-white hover:bg-white/10 bg-black/40 backdrop-blur-sm disabled:opacity-50 transition-all duration-200 shadow-lg"
-                  title={`Switch to ${facingMode === 'user' ? 'back' : 'front'} camera`}
-                >
-                  {isSwitchingCamera ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    >
-                      <RotateCcw className="w-6 h-6" />
-                    </motion.div>
-                  ) : (
-                    <RotateCcw className="w-6 h-6" />
-                  )}
-                </Button>
-                <div className="text-xs text-white/80 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full border border-white/10">
-                  {facingMode === 'user' ? '📱 Front' : '📷 Back'}
+            {/* Camera Switch Button - Instagram/Snapchat Style */}
+            <div className="absolute top-20 right-4 z-20">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={switchCamera}
+                disabled={isSwitchingCamera}
+                className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 disabled:opacity-50 transition-all duration-200"
+                title={`Switch to ${facingMode === 'user' ? 'back' : 'front'} camera`}
+              >
+                {isSwitchingCamera ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <RotateCcw className="w-6 h-6 text-white" />
+                  </motion.div>
+                ) : (
+                  <RotateCcw className="w-6 h-6 text-white" />
+                )}
+              </Button>
+            </div>
+
+            {/* Effects/Filters Button - Instagram Style */}
+            <div className="absolute top-20 left-4 z-20">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleEffects}
+                className={`w-12 h-12 rounded-full backdrop-blur-md hover:bg-black/60 transition-all duration-200 ${
+                  showEffects ? 'bg-purple-500/80' : 'bg-black/40'
+                }`}
+                title="Effects & Filters"
+              >
+                <Sparkles className="w-6 h-6 text-white" />
+              </Button>
+            </div>
+
+            {/* Grid Lines - Instagram Style */}
+            {showGrid && (
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-1/3 left-0 right-0 h-px bg-white/20"></div>
+                <div className="absolute top-2/3 left-0 right-0 h-px bg-white/20"></div>
+                <div className="absolute left-1/3 top-0 bottom-0 w-px bg-white/20"></div>
+                <div className="absolute left-2/3 top-0 bottom-0 w-px bg-white/20"></div>
+              </div>
+            )}
+
+            {/* Grid Toggle Button */}
+            <div className="absolute top-32 left-4 z-20">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleGrid}
+                className={`w-10 h-10 rounded-full backdrop-blur-md hover:bg-black/60 transition-all duration-200 ${
+                  showGrid ? 'bg-white/20' : 'bg-black/40'
+                }`}
+                title={`Grid: ${showGrid ? 'ON' : 'OFF'}`}
+              >
+                <div className="w-4 h-4 border border-white/60 rounded-sm">
+                  <div className="w-full h-px bg-white/60 mt-1"></div>
+                  <div className="w-full h-px bg-white/60 mt-1"></div>
+                  <div className="w-px h-full bg-white/60 absolute left-1/2 top-0 transform -translate-x-1/2"></div>
+                  <div className="w-px h-full bg-white/60 absolute right-1/3 top-0"></div>
+                </div>
+              </Button>
+            </div>
+
+            
+            {/* Effects Panel */}
+            {showEffects && (
+              <div className="absolute bottom-20 left-4 right-4 z-30">
+                <div className="bg-black/60 backdrop-blur-md rounded-2xl p-4">
+                  <h3 className="text-white text-sm font-medium mb-3">Effects & Filters</h3>
+                  <div className="flex space-x-3 overflow-x-auto">
+                    <button className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-white" />
+                    </button>
+                    <button className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <span className="text-white text-xs">Cool</span>
+                    </button>
+                    <button className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+                      <span className="text-white text-xs">Warm</span>
+                    </button>
+                    <button className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center">
+                      <span className="text-white text-xs">Nature</span>
+                    </button>
+                    <button className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-gray-500 to-gray-700 flex items-center justify-center">
+                      <span className="text-white text-xs">B&W</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-              
-              {availableCameras.length > 1 && (
-                <div className="text-xs text-white/60 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/5">
-                  {availableCameras.length} cameras
-                </div>
-              )}
-            </div>
-            
+            )}
+
             {/* Hidden canvas for capturing */}
             <canvas ref={canvasRef} className="hidden" />
           </>
@@ -648,35 +938,53 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
         )}
       </div>
 
-      {/* Bottom Controls */}
-      <div className="p-6 bg-gradient-to-t from-black/90 to-transparent backdrop-blur-sm">
-        {!capturedImage ? (
-          <div className="flex items-center justify-center space-x-12">
+      {/* Bottom Controls - Instagram/Snapchat Style */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 p-6">
+        {!capturedImage && storyImages.length === 0 ? (
+          <div className="flex items-center justify-between">
+            {/* Gallery Button */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="w-14 h-14 rounded-full border-white/20 text-white hover:bg-white/10 bg-black/40 backdrop-blur-sm transition-all duration-200 shadow-lg"
+              className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-all duration-200"
               onClick={() => fileInputRef.current?.click()}
             >
-              <span className="text-lg">📁</span>
-            </Button>
-            
-            <motion.button
-              className="w-20 h-20 rounded-full bg-white border-4 border-white/30 shadow-2xl hover:scale-105 transition-all duration-200"
-              whileTap={{ scale: 0.95 }}
-              onClick={handleCapture}
-            >
-              <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                <Camera className="w-8 h-8 text-black" />
+              <div className="w-8 h-8 rounded border-2 border-white/60 flex items-center justify-center">
+                <span className="text-xs text-white/60">📁</span>
               </div>
-            </motion.button>
+            </Button>
 
+            {/* Main Capture Button - Instagram/Snapchat Style */}
+            <div className="flex flex-col items-center">
+              <motion.button
+                className="w-20 h-20 rounded-full border-4 border-gray-300 shadow-2xl bg-white"
+                whileTap={{ scale: 0.9 }}
+                onClick={handleStoryCapture}
+              >
+                <div className="w-full h-full rounded-full bg-white"></div>
+              </motion.button>
+              <span className="text-xs text-white/80 mt-2 font-medium">
+                STORY
+              </span>
+            </div>
+
+            {/* Audio Recording Button */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="w-14 h-14 rounded-full border-white/20 text-white hover:bg-white/10 bg-black/40 backdrop-blur-sm transition-all duration-200 shadow-lg"
+              onClick={toggleAudioRecording}
+              className={`w-12 h-12 rounded-full backdrop-blur-md transition-all duration-200 ${
+                isRecordingAudio 
+                  ? 'bg-red-500/80 hover:bg-red-600/80' 
+                  : 'bg-black/40 hover:bg-black/60'
+              }`}
+              title={isRecordingAudio ? 'Stop Recording' : 'Start Recording'}
             >
-              <Zap className="w-7 h-7" />
+              {isRecordingAudio ? (
+                <div className="w-6 h-6 bg-white rounded-full animate-pulse" />
+              ) : (
+                <div className="w-6 h-6 bg-white rounded-full" />
+              )}
             </Button>
 
             <input

@@ -39,7 +39,7 @@ export function CommentModal({
   onReplyToComment
 }: CommentModalProps) {
   const [newComment, setNewComment] = useState('');
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState(null);
   const [replyContent, setReplyContent] = useState('');
 
   const handleSubmitComment = () => {
@@ -57,7 +57,7 @@ export function CommentModal({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent, action: () => void) => {
+  const handleKeyPress = (e: any, action: () => void) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       action();

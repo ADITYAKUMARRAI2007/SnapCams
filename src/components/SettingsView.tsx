@@ -41,7 +41,7 @@ interface SettingsViewProps {
 interface SettingSection {
   id: string;
   title: string;
-  icon: React.ReactNode;
+  icon: any;
   items: SettingItem[];
 }
 
@@ -50,7 +50,7 @@ interface SettingItem {
   title: string;
   description?: string;
   type: 'toggle' | 'select' | 'action' | 'info';
-  icon?: React.ReactNode;
+  icon?: any;
   value?: boolean | string;
   options?: string[];
   action?: () => void;
@@ -58,8 +58,8 @@ interface SettingItem {
 }
 
 export function SettingsView({ onBack, onLogout }: SettingsViewProps) {
-  const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [settings, setSettings] = useState<Record<string, any>>({
+  const [activeSection, setActiveSection] = useState(null);
+  const [settings, setSettings] = useState({
     // Account
     username: 'you',
     bio: 'Living my best life ✨',

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { motion } from 'motion/react';
 
 interface LiquidEtherBackgroundProps {
-  variant?: 'feed' | 'map' | 'profile' | 'chat' | 'camera' | 'settings' | 'friends' | 'stories';
+  variant?: 'feed' | 'map' | 'profile' | 'chat' | 'camera' | 'settings' | 'friends' | 'stories' | 'auth';
   className?: string;
 }
 
@@ -12,98 +12,109 @@ export function LiquidEtherBackground({ variant = 'feed', className = '' }: Liqu
       case 'feed':
         return {
           background: `
-            radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(99, 102, 241, 0.2) 0%, transparent 50%),
-            radial-gradient(circle at 60% 80%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
-            linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #0f172a 100%)
+            radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 60% 80%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '400% 400%, 300% 300%, 500% 500%, 350% 350%, 100% 100%'
         };
       case 'map':
         return {
           background: `
-            radial-gradient(circle at 25% 75%, rgba(34, 197, 94, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 75% 25%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.2) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(251, 191, 36, 0.15) 0%, transparent 50%),
-            linear-gradient(135deg, #1a2e1a 0%, #1e3a8a 25%, #065f46 50%, #1a2e1a 100%)
+            radial-gradient(circle at 25% 75%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 75% 25%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '450% 450%, 350% 350%, 400% 400%, 300% 300%, 100% 100%'
         };
       case 'profile':
         return {
           background: `
-            radial-gradient(circle at 30% 70%, rgba(139, 92, 246, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 70% 30%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 50% 90%, rgba(99, 102, 241, 0.2) 0%, transparent 50%),
-            radial-gradient(circle at 10% 10%, rgba(75, 85, 99, 0.15) 0%, transparent 50%),
-            linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #0f172a 100%)
+            radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '380% 380%, 420% 420%, 350% 350%, 400% 400%, 100% 100%'
         };
       case 'chat':
         return {
           background: `
-            radial-gradient(circle at 15% 85%, rgba(16, 185, 129, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 85% 15%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 45% 55%, rgba(139, 92, 246, 0.2) 0%, transparent 50%),
-            radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
-            linear-gradient(135deg, #064e3b 0%, #1e3a8a 25%, #0c4a6e 50%, #064e3b 100%)
+            radial-gradient(circle at 15% 85%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 45% 55%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '420% 420%, 380% 380%, 450% 450%, 320% 320%, 100% 100%'
         };
       case 'camera':
         return {
           background: `
-            radial-gradient(circle at 40% 60%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 60% 40%, rgba(99, 102, 241, 0.25) 0%, transparent 50%),
-            radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.2) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(75, 85, 99, 0.15) 0%, transparent 50%),
-            linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #0f172a 100%)
+            radial-gradient(circle at 40% 60%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 60% 40%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '360% 360%, 400% 400%, 380% 380%, 340% 340%, 100% 100%'
         };
       case 'settings':
         return {
           background: `
-            radial-gradient(circle at 35% 65%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 65% 35%, rgba(75, 85, 99, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 50% 10%, rgba(59, 130, 246, 0.2) 0%, transparent 50%),
-            radial-gradient(circle at 90% 90%, rgba(107, 114, 128, 0.15) 0%, transparent 50%),
-            linear-gradient(135deg, #1f2937 0%, #374151 25%, #4b5563 50%, #1f2937 100%)
+            radial-gradient(circle at 35% 65%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 65% 35%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 90% 90%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '390% 390%, 360% 360%, 410% 410%, 350% 350%, 100% 100%'
         };
       case 'friends':
         return {
           background: `
-            radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 75% 75%, rgba(139, 92, 246, 0.25) 0%, transparent 50%),
-            radial-gradient(circle at 50% 80%, rgba(99, 102, 241, 0.2) 0%, transparent 50%),
-            radial-gradient(circle at 10% 50%, rgba(75, 85, 99, 0.15) 0%, transparent 50%),
-            linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #0f172a 100%)
+            radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 10% 50%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '400% 400%, 370% 370%, 390% 390%, 360% 360%, 100% 100%'
         };
       case 'stories':
         return {
           background: `
-            radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 70% 70%, rgba(75, 85, 99, 0.2) 0%, transparent 50%),
-            linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #0f172a 100%)
+            radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '350% 350%, 410% 410%, 380% 380%, 400% 400%, 100% 100%'
+        };
+      case 'auth':
+        return {
+          background: `
+            radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
+          `,
+          backgroundSize: '400% 400%, 350% 350%, 450% 450%, 300% 300%, 100% 100%'
         };
       default:
         return {
           background: `
-            radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(99, 102, 241, 0.2) 0%, transparent 50%),
-            linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #0f172a 100%)
+            radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+            linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #111111 50%, #000000 100%)
           `,
           backgroundSize: '400% 400%, 300% 300%, 500% 500%, 100% 100%'
         };

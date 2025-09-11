@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, MessageCircle, UserPlus, UserMinus, Share, MoreVertical, MapPin, Calendar, Users, Heart, Eye, Camera } from 'lucide-react';
 import { Button } from './ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
@@ -266,25 +265,34 @@ export function OtherProfileView({
 
       {/* Content Tabs */}
       <div className="px-6">
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-white/10 rounded-2xl p-1">
-            <TabsTrigger 
-              value="posts" 
-              className="rounded-xl data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/60"
+        <div className="w-full">
+          <div className="grid w-full grid-cols-2 bg-white/10 rounded-2xl p-1">
+            <button
+              onClick={() => setSelectedTab('posts')}
+              className={`rounded-xl flex items-center justify-center py-2 px-4 transition-colors ${
+                selectedTab === 'posts' 
+                  ? 'bg-white/20 text-white' 
+                  : 'text-white/60 hover:text-white/80'
+              }`}
             >
               <Camera className="w-4 h-4 mr-2" />
               Posts ({stats.posts})
-            </TabsTrigger>
-            <TabsTrigger 
-              value="about" 
-              className="rounded-xl data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/60"
+            </button>
+            <button
+              onClick={() => setSelectedTab('about')}
+              className={`rounded-xl flex items-center justify-center py-2 px-4 transition-colors ${
+                selectedTab === 'about' 
+                  ? 'bg-white/20 text-white' 
+                  : 'text-white/60 hover:text-white/80'
+              }`}
             >
               <Users className="w-4 h-4 mr-2" />
               About
-            </TabsTrigger>
-          </TabsList>
+            </button>
+          </div>
 
-          <TabsContent value="posts" className="mt-6">
+          {selectedTab === 'posts' && (
+            <div className="mt-6">
             {user.isPrivate && !user.isFollowing ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -346,9 +354,11 @@ export function OtherProfileView({
                 ))}
               </div>
             )}
-          </TabsContent>
+            </div>
+          )}
 
-          <TabsContent value="about" className="mt-6">
+          {selectedTab === 'about' && (
+            <div className="mt-6">
             <div className="space-y-6">
               {/* Activity Stats */}
               <div className="bg-white/5 rounded-2xl p-4">
@@ -424,8 +434,9 @@ export function OtherProfileView({
                 </div>
               )}
             </div>
-          </TabsContent>
-        </Tabs>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

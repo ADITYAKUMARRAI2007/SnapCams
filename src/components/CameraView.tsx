@@ -3,6 +3,7 @@ import { Camera, X, Sparkles, MapPin, Send, Zap, Music, Play, Pause, RotateCcw }
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { apiService } from '../services/api';
 
 interface CameraViewProps {
   onClose: () => void;
@@ -12,35 +13,35 @@ interface CameraViewProps {
 }
 
 export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }: CameraViewProps) {
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedImage, setCapturedImage] = useState(null);
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [generatedCaption, setGeneratedCaption] = useState('');
-  const [generatedHashtags, setGeneratedHashtags] = useState<string[]>([]);
+  const [generatedHashtags, setGeneratedHashtags] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [showMusicSelector, setShowMusicSelector] = useState(false);
-  const [selectedMusic, setSelectedMusic] = useState<any>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState(null);
+  const [stream, setStream] = useState(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [cameraError, setCameraError] = useState(null);
+  const [facingMode, setFacingMode] = useState('environment');
   const [cameraRequested, setCameraRequested] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(true);
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
-  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
-  const [cameraMode, setCameraMode] = useState<'photo' | 'story'>('story');
-  const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
+  const [availableCameras, setAvailableCameras] = useState([]);
+  const [cameraMode, setCameraMode] = useState('story');
+  const [flashMode, setFlashMode] = useState('off');
   const [showEffects, setShowEffects] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
-  const [storyImages, setStoryImages] = useState<string[]>([]);
+  const [storyImages, setStoryImages] = useState([]);
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   // Detect available cameras
   const detectCameras = async () => {
@@ -414,25 +415,89 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     }
   };
 
-  // Mock AI caption generation
+  // AI caption generation using Gemini
   const generateCaption = async () => {
     setIsGeneratingCaption(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
+    try {
+      // Get current image (either captured or uploaded)
+      const imageElement = capturedImage ? 
+        document.querySelector('img[src*="blob:"]') as HTMLImageElement :
+        null;
+      
+      if (!imageElement) {
+        // Fallback to mock caption if no image
+        generateMockCaption();
+        return;
+      }
+      
+      // Convert image to File for API
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = imageElement.naturalWidth;
+      canvas.height = imageElement.naturalHeight;
+      ctx?.drawImage(imageElement, 0, 0);
+      
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          generateMockCaption();
+          return;
+        }
+        
+        const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
+        
+        // Get context for AI (location, mood, time)
+        const context = {
+          location: 'Unknown',
+          mood: 'General',
+          timeOfDay: new Date().getHours() < 12 ? 'morning' : 
+                    new Date().getHours() < 18 ? 'afternoon' : 'evening'
+        };
+        
+        try {
+          const response = await apiService.generateCaption(file, context);
+          
+          if (response.success && response.data) {
+            setGeneratedCaption(response.data.caption);
+            setGeneratedHashtags(response.data.hashtags);
+          } else {
+            generateMockCaption();
+          }
+        } catch (error) {
+          console.error('AI caption generation failed:', error);
+          generateMockCaption();
+        } finally {
+          setIsGeneratingCaption(false);
+        }
+      }, 'image/jpeg', 0.8);
+      
+    } catch (error) {
+      console.error('Error generating caption:', error);
+      generateMockCaption();
+    }
+  };
+
+  // Fallback mock caption generation
+  const generateMockCaption = () => {
     const captions = [
-      "Lost in the beauty of everyday moments ✨",
-      "Finding magic in the ordinary streets of life",
-      "When the city speaks in colors and shadows",
-      "Capturing memories one frame at a time",
-      "Street poetry written in light and shadow"
+      "no thoughts just vibes ✨",
+      "main character energy fr 💅",
+      "this hits different at 3am 🕐",
+      "pov: you're living your best life 📸",
+      "the serotonin this gives me >> 🧠",
+      "slaying so hard rn 💅✨",
+      "this is my villain era 🖤",
+      "bestie this is iconic 📸",
+      "the way this makes me feel >> 😭",
+      "living for this moment fr 💯"
     ];
     
     const hashtags = [
-      ["streetphotography", "urban", "citylife", "moment"],
-      ["inspiration", "beautiful", "everyday", "magic"],
-      ["photography", "art", "creative", "vision"],
-      ["memories", "capture", "life", "journey"],
-      ["aesthetic", "mood", "vibes", "artistic"]
+      ["vibes", "aesthetic", "mood", "slay"],
+      ["maincharacter", "genz", "relatable", "iconic"],
+      ["obsessed", "bestie", "mood", "vibes"],
+      ["aesthetic", "mood", "vibes", "artistic"],
+      ["serotonin", "brain", "feelings", "mood"]
     ];
     
     const randomIndex = Math.floor(Math.random() * captions.length);
@@ -468,14 +533,35 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
     // Don't stop camera for story mode - keep it running for multiple captures
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: any) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      
       const url = URL.createObjectURL(file);
       setCapturedImage(url);
+      
+      // Add to story images for Instagram-style multiple photos
+      setStoryImages(prev => [...prev, url]);
+      setCurrentStoryIndex(storyImages.length);
+      
       // Stop camera when using file upload
       stopCamera();
+      
+      // Generate AI caption for uploaded photo
       generateCaption();
+      
+      console.log('Photo uploaded successfully:', file.name);
     }
   };
 
@@ -953,16 +1039,16 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
                 <span className="text-xs text-white/60">📁</span>
               </div>
             </Button>
-
+            
             {/* Main Capture Button - Instagram/Snapchat Style */}
             <div className="flex flex-col items-center">
-              <motion.button
+            <motion.button
                 className="w-20 h-20 rounded-full border-4 border-gray-300 shadow-2xl bg-white"
                 whileTap={{ scale: 0.9 }}
                 onClick={handleStoryCapture}
-              >
-                <div className="w-full h-full rounded-full bg-white"></div>
-              </motion.button>
+            >
+              <div className="w-full h-full rounded-full bg-white"></div>
+            </motion.button>
               <span className="text-xs text-white/80 mt-2 font-medium">
                 STORY
               </span>
@@ -990,7 +1076,8 @@ export function CameraView({ onClose, onCapture, onStoryUpload, userStreak = 0 }
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
+              multiple
               className="hidden"
               onChange={handleFileUpload}
             />

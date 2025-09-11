@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { LiquidEtherBackground } from './LiquidEtherBackground';
+// Removed ChatModal import - using main chat view instead
 
 interface Friend {
   id: string;
@@ -42,16 +43,17 @@ interface SuggestedFriend {
 
 interface FriendsViewProps {
   onAddFriend: (friendId: string) => void;
-  onMessageFriend: (friendId: string) => void;
+  onMessageFriend: (friend: any) => void;
 }
 
 export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) {
-  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'discover'>('friends');
+  const [activeTab, setActiveTab] = useState('friends');
   const [searchQuery, setSearchQuery] = useState('');
+  // Removed unused chat modal state variables
 
-  const [friends] = useState<Friend[]>([
+  const [friends] = useState([
     {
-      id: '1',
+      id: '68c16d7ed3ffa114b597f1fe', // Real MongoDB ObjectId for alexandra_dreams
       username: 'alexandra_dreams',
       displayName: 'Alexandra ✨',
       avatar: 'https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
@@ -63,10 +65,11 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
       location: 'Downtown Coffee',
       status: 'online',
       snapScore: 2847,
-      bestFriends: true
+      bestFriends: true,
+      isOnline: true
     },
     {
-      id: '2',
+      id: '68c16d7ed3ffa114b597f1ff', // Real MongoDB ObjectId for cosmic_wanderer
       username: 'cosmic_wanderer',
       displayName: 'Cosmic Soul 🌙',
       avatar: 'https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
@@ -78,40 +81,12 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
       location: 'Sunset Hills',
       status: 'away',
       snapScore: 1956,
-      bestFriends: true
-    },
-    {
-      id: '3',
-      username: 'urban_explorer',
-      displayName: 'Street Artist 🎨',
-      avatar: 'https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
-      isFollowing: true,
-      isFollowingBack: false,
-      mutualFriends: 15,
-      lastSeen: '3h ago',
-      streak: 8,
-      status: 'offline',
-      snapScore: 3421,
-      bestFriends: false
-    },
-    {
-      id: '4',
-      username: 'mountain_soul',
-      displayName: 'Adventure Seeker ⛰️',
-      avatar: 'https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
-      isFollowing: true,
-      isFollowingBack: true,
-      mutualFriends: 6,
-      lastSeen: '1d ago',
-      streak: 67,
-      location: 'Rocky Mountains',
-      status: 'offline',
-      snapScore: 4892,
-      bestFriends: false
+      bestFriends: true,
+      isOnline: false
     }
   ]);
 
-  const [friendRequests] = useState<FriendRequest[]>([
+  const [friendRequests] = useState([
     {
       id: '1',
       username: 'photo_enthusiast',
@@ -130,7 +105,7 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
     }
   ]);
 
-  const [suggestedFriends] = useState<SuggestedFriend[]>([
+  const [suggestedFriends] = useState([
     {
       id: '1',
       username: 'travel_diary',
@@ -321,7 +296,10 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
                                 size="sm"
                                 variant="outline"
                                 className="border-white/20 text-white hover:bg-white/20"
-                                onClick={() => onMessageFriend(friend.id)}
+                                onClick={() => {
+                                  // Pass the actual MongoDB ObjectId to open chat correctly
+                                  onMessageFriend(friend.id);
+                                }}
                               >
                                 <MessageCircle className="w-4 h-4" />
                               </Button>
@@ -373,7 +351,10 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
                                 size="sm"
                                 variant="outline"
                                 className="border-white/20 text-white hover:bg-white/20 p-2"
-                                onClick={() => onMessageFriend(friend.id)}
+                                onClick={() => {
+                                  // Pass the actual MongoDB ObjectId to open chat correctly
+                                  onMessageFriend(friend.id);
+                                }}
                               >
                                 <MessageCircle className="w-4 h-4" />
                               </Button>
@@ -485,6 +466,8 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Chat Modal removed - using main chat view instead */}
     </div>
   );
 }

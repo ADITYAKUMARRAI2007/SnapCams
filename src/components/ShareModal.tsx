@@ -35,7 +35,7 @@ interface ShareModalProps {
 interface ShareOption {
   id: string;
   name: string;
-  icon: React.ReactNode;
+  icon: any;
   color: string;
   action: () => void;
 }

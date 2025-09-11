@@ -38,11 +38,11 @@ interface ChatViewProps {
 }
 
 export function ChatView({ onBack, onOpenIndividualChat }: ChatViewProps) {
-  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [selectedChat, setSelectedChat] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [messageText, setMessageText] = useState('');
 
-  const [chats] = useState<Chat[]>([
+  const [chats] = useState([
     {
       id: '1',
       user: {
@@ -93,7 +93,7 @@ export function ChatView({ onBack, onOpenIndividualChat }: ChatViewProps) {
     }
   ]);
 
-  const [messages] = useState<{ [chatId: string]: Message[] }>({
+  const [messages] = useState({
     '1': [
       {
         id: '1',

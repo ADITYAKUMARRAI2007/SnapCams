@@ -38,7 +38,7 @@ export function FollowersModal({
   onViewProfile 
 }: FollowersModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [followingStates, setFollowingStates] = useState<{ [key: string]: boolean }>({});
+  const [followingStates, setFollowingStates] = useState({});
 
   const filteredFollowers = followers.filter(follower =>
     follower.username.toLowerCase().includes(searchQuery.toLowerCase()) ||

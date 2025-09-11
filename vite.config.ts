@@ -5,6 +5,10 @@
 
   export default defineConfig({
     plugins: [react()],
+    define: {
+      // Cesium configuration
+      CESIUM_BASE_URL: JSON.stringify('/cesium/')
+    },
     css: {
       postcss: './postcss.config.js',
     },
@@ -62,7 +66,8 @@
           manualChunks: {
             vendor: ['react', 'react-dom'],
             motion: ['motion/react'],
-            ui: ['lucide-react']
+            ui: ['lucide-react'],
+            cesium: ['cesium']
           }
         }
       }

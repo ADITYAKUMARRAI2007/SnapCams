@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, MapPin, Plus, Navigation, Search, Filter, Users, Compass, Home, Clock, UserPlus, Settings, Map, Layers } from 'lucide-react';
+import { Camera, MapPin, Plus, Navigation, Search, Filter, Users, Compass, Home, Clock, UserPlus, Settings, Map, Layers, X, Heart, MessageCircle, Share } from 'lucide-react';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+
+// Extend the Window interface to include google.maps
+declare global {
+  interface Window {
+    google?: any;
+    initGoogleMaps?: () => void;
+  }
+}
 
 interface Pin {
   id: string;
@@ -112,19 +120,90 @@ const GOOGLE_MAPS_CONFIG = {
 };
 
 export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSettingsClick }: MapViewProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const googleMapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-  const [selectedPin, setSelectedPin] = useState<Pin | null>(null);
-  const [activeTab, setActiveTab] = useState<'memories' | 'visited' | 'popular' | 'favorites'>('memories');
+  const mapRef = useRef(null);
+  const googleMapRef = useRef(null);
+  const markersRef = useRef([]);
+  const [selectedPin, setSelectedPin] = useState(null);
+  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [activeTab, setActiveTab] = useState('memories');
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  const [friends] = useState<Friend[]>([
+  const [showFriendStories, setShowFriendStories] = useState(false);
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const [isStoryPlaying, setIsStoryPlaying] = useState(false);
+
+  // Mock story posts for each friend
+  const friendStories = {
+    '1': [
+      {
+        id: '1-1',
+        image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbnxlbnwwfHx8fDE3NTcxMDM0Mjd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+        caption: 'Morning hike vibes 🏔️✨',
+        timestamp: '2h ago',
+        location: 'Mountain Peak'
+      },
+      {
+        id: '1-2',
+        image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb3Jlc3R8ZW58MHx8fHwxNzU3MTAzNDI3fDA&ixlib=rb-4.1.0&q=80&w=1080',
+        caption: 'Lost in the forest 🌲',
+        timestamp: '4h ago',
+        location: 'Forest Trail'
+      },
+      {
+        id: '1-3',
+        image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdW5zZXR8ZW58MHx8fHwxNzU3MTAzNDI3fDA&ixlib=rb-4.1.0&q=80&w=1080',
+        caption: 'Golden hour magic ✨',
+        timestamp: '6h ago',
+        location: 'Sunset Point'
+      }
+    ],
+    '2': [
+      {
+        id: '2-1',
+        image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaXR5fGVufDB8fHx8MTc1NzEwMzQyN3ww&ixlib=rb-4.1.0&q=80&w=1080',
+        caption: 'City lights never sleep 🌃',
+        timestamp: '1h ago',
+        location: 'Downtown'
+      },
+      {
+        id: '2-2',
+        image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjYWZl8ZW58MHx8fHwxNzU3MTAzNDI3fDA&ixlib=rb-4.1.0&q=80&w=1080',
+        caption: 'Coffee and creativity ☕',
+        timestamp: '3h ago',
+        location: 'Local Cafe'
+      }
+    ],
+    '3': [
+      {
+        id: '3-1',
+        image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaHxlbnwwfHx8fDE3NTcxMDM0Mjd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+        caption: 'Beach day vibes 🏖️',
+        timestamp: '30m ago',
+        location: 'Sandy Beach'
+      },
+      {
+        id: '3-2',
+        image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3YXRlcnxlbnwwfHx8fDE3NTcxMDM0Mjd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+        caption: 'Ocean waves therapy 🌊',
+        timestamp: '2h ago',
+        location: 'Ocean View'
+      },
+      {
+        id: '3-3',
+        image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdW5zZXR8ZW58MHx8fHwxNzU3MTAzNDI3fDA&ixlib=rb-4.1.0&q=80&w=1080',
+        caption: 'Sunset meditation 🧘‍♀️',
+        timestamp: '5h ago',
+        location: 'Beach Pier'
+      }
+    ]
+  };
+
+  const [friends] = useState([
     {
       id: '1',
       username: 'alexandra_dreams',
       displayName: 'Alexandra',
-      avatar: 'https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
+      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
       location: { x: 35, y: 25 },
       isOnline: true,
       lastSeen: '2m ago',
@@ -135,7 +214,7 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
       id: '2',
       username: 'cosmic_wanderer',
       displayName: 'Cosmic',
-      avatar: 'https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
       location: { x: 70, y: 60 },
       isOnline: false,
       lastSeen: '1h ago',
@@ -145,16 +224,37 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
       id: '3',
       username: 'urban_explorer',
       displayName: 'Street Artist',
-      avatar: 'https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
       location: { x: 65, y: 80 },
       isOnline: true,
       lastSeen: 'now',
       activity: 'Art District',
       badge: 'Top Pick'
+    },
+    {
+      id: '4',
+      username: 'nature_lover',
+      displayName: 'Emma',
+      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
+      location: { x: 20, y: 70 },
+      isOnline: true,
+      lastSeen: '5m ago',
+      activity: 'Central Park',
+      badge: 'New Story'
+    },
+    {
+      id: '5',
+      username: 'city_photographer',
+      displayName: 'Marcus',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
+      location: { x: 80, y: 30 },
+      isOnline: false,
+      lastSeen: '3h ago',
+      activity: 'Skyline View'
     }
   ]);
 
-  const [places] = useState<Place[]>([
+  const [places] = useState([
     {
       id: '1',
       name: 'Meghana Foods',
@@ -200,44 +300,135 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
         return;
       }
 
-      // For demo purposes, we'll use the fallback implementation
-      // In production, you would replace 'DEMO_MODE' with your actual Google Maps API key
-      const API_KEY = 'DEMO_MODE'; // Replace with your actual API key
+      // Check if script is already being loaded
+      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        console.log('Google Maps script already loading');
+        // If script is already loading, set up callback anyway
+        (window as any).initGoogleMaps = () => {
+          console.log('Google Maps callback triggered (existing script)');
+          initializeMap();
+          delete (window as any).initGoogleMaps;
+        };
+        return;
+      }
+
+      // Get Google Maps API key from environment or use demo mode
+      const API_KEY: string = 'AIzaSyBl6C1l-LqgdLmLYswhBa5FZWuEHjDHC18';
       
-      if (API_KEY === 'DEMO_MODE' || !API_KEY) {
+      console.log('Google Maps API Key:', API_KEY ? 'Present' : 'Missing');
+      
+      if (!API_KEY || API_KEY === 'DEMO_MODE') {
         console.log('Demo mode: Using fallback map implementation');
         createMockGoogleMaps();
         return;
       }
 
       try {
+        // Use a simple, static callback name
+        const callbackName = 'initGoogleMaps';
+        
+        // Set up global callback BEFORE creating the script
+        (window as any)[callbackName] = () => {
+          console.log('Google Maps callback triggered');
+          initializeMap();
+          // Don't delete immediately, let cleanup handle it
+        };
+        
         // Create script element with proper async loading
         const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=marker,places&loading=async&callback=initGoogleMaps`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&loading=async&callback=${callbackName}`;
         script.async = true;
         script.defer = true;
         
-        // Set up global callback
-        (window as any).initGoogleMaps = () => {
+        // Ensure callback is attached to window before script loads
+        script.onload = () => {
+          console.log('Google Maps script loaded successfully');
+          // Double-check that callback is still available
+          if ((window as any)[callbackName]) {
+            console.log('Callback function is available');
+          } else {
+            console.log('Callback function missing, setting up again');
+            (window as any)[callbackName] = () => {
+              console.log('Google Maps callback triggered (onload)');
           initializeMap();
-          delete (window as any).initGoogleMaps;
+              delete (window as any)[callbackName];
+            };
+          }
         };
         
-        script.onerror = () => {
-          console.log('Google Maps API failed to load, using fallback implementation');
+        script.onerror = (error) => {
+          console.error('Google Maps API failed to load:', error);
           createMockGoogleMaps();
-          delete (window as any).initGoogleMaps;
+          delete (window as any)[callbackName];
         };
         
         document.head.appendChild(script);
+        
+        // Fallback timeout in case callback never fires
+        setTimeout(() => {
+          if (!mapLoaded) {
+            console.log('Google Maps loading timeout, using fallback');
+            createMockGoogleMaps();
+            // Don't delete callback here, let cleanup handle it
+          }
+        }, 10000); // 10 second timeout
+        
       } catch (error) {
-        console.log('Error loading Google Maps, using fallback implementation');
+        console.error('Error loading Google Maps:', error);
         createMockGoogleMaps();
       }
     };
 
     loadGoogleMaps();
+
+    // Cleanup function
+    return () => {
+      // Clean up global callback
+      if ((window as any).initGoogleMaps) {
+        delete (window as any).initGoogleMaps;
+      }
+    };
   }, []);
+
+  // Auto-play stories with slow transitions
+  useEffect(() => {
+    if (showFriendStories && selectedFriend && isStoryPlaying) {
+      const stories = friendStories[selectedFriend.id as keyof typeof friendStories] || [];
+      if (stories.length > 0) {
+        const timer = setTimeout(() => {
+          setCurrentStoryIndex((prev) => {
+            const nextIndex = prev + 1;
+            if (nextIndex >= stories.length) {
+              setIsStoryPlaying(false);
+              setShowFriendStories(false);
+              return 0;
+            }
+            return nextIndex;
+          });
+        }, 4000); // 4 seconds per story for slow, aesthetic feel
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [showFriendStories, selectedFriend, currentStoryIndex, isStoryPlaying]);
+
+  const handleStoryNext = () => {
+    if (selectedFriend) {
+      const stories = friendStories[selectedFriend.id as keyof typeof friendStories] || [];
+      if (currentStoryIndex < stories.length - 1) {
+        setCurrentStoryIndex(currentStoryIndex + 1);
+      } else {
+        setShowFriendStories(false);
+        setIsStoryPlaying(false);
+      }
+    }
+  };
+
+  const handleStoryPrev = () => {
+    if (currentStoryIndex > 0) {
+      setCurrentStoryIndex(currentStoryIndex - 1);
+    }
+  };
 
   const createMockGoogleMaps = () => {
     // Create a mock Google Maps implementation for demo
@@ -245,22 +436,30 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
   };
 
   const initializeMap = () => {
+    try {
     if (mapRef.current && window.google?.maps) {
+        console.log('Initializing Google Map...');
       googleMapRef.current = new window.google.maps.Map(mapRef.current, {
         center: GOOGLE_MAPS_CONFIG.center,
         zoom: GOOGLE_MAPS_CONFIG.zoom,
-        styles: GOOGLE_MAPS_CONFIG.styles,
         disableDefaultUI: true,
         gestureHandling: 'greedy',
         zoomControl: false,
         mapTypeControl: false,
         streetViewControl: false,
-        fullscreenControl: false,
-        mapId: 'DEMO_MAP_ID' // Required for Advanced Markers
+          fullscreenControl: false
       });
 
+        console.log('Google Map initialized successfully');
       setMapLoaded(true);
       addMarkersToMap();
+      } else {
+        console.error('Map ref or Google Maps not available');
+        createMockGoogleMaps();
+      }
+    } catch (error) {
+      console.error('Error initializing Google Map:', error);
+      createMockGoogleMaps();
     }
   };
 
@@ -320,12 +519,17 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
         </div>
       `;
 
-      try {
-        const marker = new window.google.maps.marker.AdvancedMarkerElement({
-          map: googleMapRef.current,
+      // Use regular markers instead of Advanced Markers to avoid API issues
+      if (window.google.maps.Marker) {
+        const marker = new window.google.maps.Marker({
           position: { lat, lng },
-          content: markerContent,
-          title: pin.caption
+          map: googleMapRef.current,
+          title: pin.caption,
+          icon: {
+            url: pin.image,
+            scaledSize: new window.google.maps.Size(40, 40),
+            anchor: new window.google.maps.Point(20, 20)
+          }
         });
 
         marker.addListener('click', () => {
@@ -334,21 +538,6 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
         });
 
         markersRef.current.push(marker);
-      } catch (error) {
-        console.log('Advanced markers not available, using fallback');
-        // Fallback to basic marker if AdvancedMarkerElement fails
-        if (window.google.maps.Marker) {
-          const fallbackMarker = new window.google.maps.Marker({
-            position: { lat, lng },
-            map: googleMapRef.current,
-            title: pin.caption
-          });
-
-          fallbackMarker.addListener('click', () => {
-            setSelectedPin(pin);
-            onPinClick(pin);
-          });
-        }
       }
     });
   };
@@ -517,6 +706,105 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
               </motion.div>
             );
           })}
+
+          {/* Friend location markers - Snapchat style */}
+          {friends.map((friend, index) => (
+            <motion.div
+              key={friend.id}
+              className="absolute z-20 cursor-pointer"
+              style={{ 
+                left: `${friend.location.x}%`, 
+                top: `${friend.location.y}%`,
+                transform: 'translate(-50%, -50%)'
+              }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ 
+                scale: 1, 
+                y: [0, -2, 0], 
+                opacity: 1 
+              }}
+              transition={{ 
+                scale: { delay: 0.5 + index * 0.1, type: "spring" },
+                opacity: { delay: 0.5 + index * 0.1 },
+                y: { 
+                  duration: 3,
+                  repeat: Infinity,
+                  delay: index * 0.3
+                }
+              }}
+              whileHover={{ 
+                scale: 1.3,
+                y: -8,
+                transition: { duration: 0.2 }
+              }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                setSelectedFriend(friend);
+                setCurrentStoryIndex(0);
+                setIsStoryPlaying(true);
+                setShowFriendStories(true);
+              }}
+            >
+              <div className="relative">
+                {/* Friend avatar with online indicator */}
+                <motion.div 
+                  className={`w-10 h-10 rounded-full p-0.5 shadow-lg border-2 ${
+                    friend.isOnline 
+                      ? 'border-green-400 bg-green-400' 
+                      : 'border-gray-400 bg-gray-400'
+                  }`}
+                  animate={friend.isOnline ? {
+                    boxShadow: [
+                      '0 0 0 0 rgba(34, 197, 94, 0.7)',
+                      '0 0 0 10px rgba(34, 197, 94, 0)',
+                      '0 0 0 0 rgba(34, 197, 94, 0)'
+                    ]
+                  } : {}}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  <div className="w-full h-full rounded-full overflow-hidden">
+                    <ImageWithFallback
+                      src={friend.avatar}
+                      alt={friend.displayName}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </motion.div>
+                
+                {/* Story indicator */}
+                {friend.badge && (
+                  <motion.div 
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg"
+                    animate={{ 
+                      scale: [1, 1.2, 1],
+                      rotate: [0, 5, -5, 0]
+                    }}
+                    transition={{ 
+                      duration: 2,
+                      repeat: Infinity,
+                      delay: index * 0.2
+                    }}
+                  >
+                    <span className="text-xs">📸</span>
+                  </motion.div>
+                )}
+                
+                {/* Friend name tooltip */}
+                <motion.div 
+                  className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 pointer-events-none"
+                  whileHover={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {friend.displayName}
+                  {friend.isOnline && <span className="text-green-400 ml-1">●</span>}
+                </motion.div>
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
 
@@ -694,6 +982,170 @@ export function MapView({ onCameraClick, pins, onPinClick, userStreak = 0, onSet
               <div className="flex items-center justify-center mt-4">
                 <div className="w-12 h-1 bg-gray-600 rounded-full" />
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Instagram-style Friend Stories Modal */}
+      <AnimatePresence>
+        {showFriendStories && selectedFriend && (
+          <motion.div
+            className="fixed inset-0 bg-black z-50 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              setShowFriendStories(false);
+              setIsStoryPlaying(false);
+            }}
+          >
+            <motion.div
+              className="w-full h-full max-w-md max-h-[90vh] bg-black rounded-2xl overflow-hidden relative"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {(() => {
+                const stories = friendStories[selectedFriend.id as keyof typeof friendStories] || [];
+                const currentStory = stories[currentStoryIndex];
+                
+                if (!currentStory) return null;
+
+                return (
+                  <>
+                    {/* Story Header */}
+                    <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/50 to-transparent">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white">
+                            <ImageWithFallback
+                              src={selectedFriend.avatar}
+                              alt={selectedFriend.displayName}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <h3 className="text-white font-semibold text-sm">{selectedFriend.displayName}</h3>
+                            <p className="text-gray-300 text-xs">{currentStory.timestamp}</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setShowFriendStories(false);
+                            setIsStoryPlaying(false);
+                          }}
+                          className="text-white hover:bg-white/20 w-8 h-8"
+                        >
+                          <X className="w-5 h-5" />
+                        </Button>
+                      </div>
+                      
+                      {/* Story Progress Bar */}
+                      <div className="mt-3 flex space-x-1">
+                        {stories.map((_, index) => (
+                          <motion.div
+                            key={index}
+                            className="h-1 rounded-full bg-white/30"
+                            style={{ flex: 1 }}
+                            initial={{ scaleX: 0 }}
+                            animate={{ 
+                              scaleX: index <= currentStoryIndex ? 1 : 0,
+                              backgroundColor: index === currentStoryIndex ? '#ffffff' : index < currentStoryIndex ? '#ffffff' : 'rgba(255,255,255,0.3)'
+                            }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Story Image with Slow Transition */}
+                    <motion.div
+                      className="w-full h-full relative"
+                      key={currentStory.id}
+                      initial={{ opacity: 0, scale: 1.1 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.8, ease: "easeInOut" }}
+                    >
+                      <ImageWithFallback
+                        src={currentStory.image}
+                        alt={currentStory.caption}
+                        className="w-full h-full object-cover"
+                      />
+                      
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    </motion.div>
+
+                    {/* Story Caption */}
+                    <motion.div
+                      className="absolute bottom-20 left-0 right-0 p-4 z-10"
+                      key={`caption-${currentStory.id}`}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5, duration: 0.6 }}
+                    >
+                      <div className="bg-black/40 backdrop-blur-sm rounded-2xl p-4">
+                        <p className="text-white text-lg font-medium mb-2">{currentStory.caption}</p>
+                        <div className="flex items-center space-x-2 text-gray-300 text-sm">
+                          <MapPin className="w-4 h-4" />
+                          <span>{currentStory.location}</span>
+                          <span>•</span>
+                          <span>{currentStory.timestamp}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+
+                    {/* Story Actions */}
+                    <motion.div
+                      className="absolute bottom-4 left-0 right-0 p-4 z-10"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.8, duration: 0.6 }}
+                    >
+                      <div className="flex items-center justify-center space-x-6">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-white hover:bg-white/20 w-12 h-12 rounded-full"
+                        >
+                          <Heart className="w-6 h-6" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-white hover:bg-white/20 w-12 h-12 rounded-full"
+                        >
+                          <MessageCircle className="w-6 h-6" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-white hover:bg-white/20 w-12 h-12 rounded-full"
+                        >
+                          <Share className="w-6 h-6" />
+                        </Button>
+                      </div>
+                    </motion.div>
+
+                    {/* Navigation Areas */}
+                    <div className="absolute inset-0 flex">
+                      <div 
+                        className="w-1/2 h-full cursor-pointer"
+                        onClick={handleStoryPrev}
+                      />
+                      <div 
+                        className="w-1/2 h-full cursor-pointer"
+                        onClick={handleStoryNext}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
             </motion.div>
           </motion.div>
         )}

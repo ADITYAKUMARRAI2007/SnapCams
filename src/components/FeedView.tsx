@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Share, MoreVertical, MapPin, Bookmark, Send, User
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { apiService, Post, Story as BackendStory } from '../services/api';
 
 interface FeedPost {
   id: string;
@@ -347,8 +348,43 @@ function ReelPost({ post, isActive, onLike, onComment, onDuet, onFollow, onSaveP
 
 export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePost, onSharePost, onViewProfile, stories, onStoryClick }: FeedViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [backendPosts, setBackendPosts] = useState([]);
+  const [backendStories, setBackendStories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const containerRef = useRef(null);
   const isScrolling = useRef(false);
+
+  // Load data from backend
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Load posts and stories in parallel
+        const [postsResponse, storiesResponse] = await Promise.all([
+          apiService.getFeed(),
+          apiService.getStories()
+        ]);
+
+        if (postsResponse.success && postsResponse.data) {
+          setBackendPosts(postsResponse.data.posts);
+        }
+
+        if (storiesResponse.success && storiesResponse.data) {
+          setBackendStories(storiesResponse.data.stories);
+        }
+      } catch (error) {
+        console.error('Error loading feed data:', error);
+        setError('Failed to load feed data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Handle scroll with snap behavior
   const handleScroll = () => {
@@ -385,7 +421,8 @@ export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePos
   // Auto-advance functionality (optional - like TikTok)
   useEffect(() => {
     const timer = setInterval(() => {
-      if (currentIndex < posts.length - 1) {
+      const totalPosts = backendPosts.length || posts.length;
+      if (currentIndex < totalPosts - 1) {
         const nextIndex = currentIndex + 1;
         setCurrentIndex(nextIndex);
         scrollToPost(nextIndex);
@@ -393,7 +430,36 @@ export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePos
     }, 10000); // 10 seconds per post
 
     return () => clearInterval(timer);
-  }, [currentIndex, posts.length]);
+  }, [currentIndex, backendPosts.length, posts.length]);
+
+  // Convert backend posts to frontend format
+  const displayPosts = backendPosts.length > 0 ? backendPosts.map(post => ({
+    id: post.id,
+    author: post.author.displayName,
+    authorAvatar: post.author.avatar,
+    image: post.image,
+    caption: post.caption,
+    hashtags: post.hashtags,
+    likes: post.likesCount,
+    comments: post.commentsCount,
+    shares: post.shares,
+    isLiked: post.isLiked || false,
+    streak: post.streak,
+    duets: post.duetsCount,
+    location: post.location?.name,
+    timeAgo: new Date(post.createdAt).toLocaleDateString()
+  })) : posts;
+
+  // Convert backend stories to frontend format
+  const displayStories = backendStories.length > 0 ? backendStories.map(story => ({
+    id: story.id,
+    author: story.author.displayName,
+    authorAvatar: story.author.avatar,
+    content: story.content,
+    streak: story.contentCount,
+    lastUpdated: new Date(story.updatedAt).getTime(),
+    isViewed: story.isViewed || false
+  })) : stories;
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-black">
@@ -420,7 +486,7 @@ export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePos
             </button>
 
             {/* Friends' Stories */}
-            {stories.map((story) => (
+            {displayStories.map((story) => (
               <button
                 key={story.id}
                 className="flex-shrink-0 flex flex-col items-center space-y-2"
@@ -446,49 +512,78 @@ export function FeedView({ posts, onLike, onComment, onDuet, onFollow, onSavePos
         </div>
       </motion.div>
 
-      {/* Main Feed - Scrollable Container */}
-      <div 
-        ref={containerRef}
-        className="absolute top-24 left-0 right-0 bottom-0 overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-        onScroll={handleScroll}
-        style={{ scrollBehavior: 'smooth' }}
-      >
-        {posts.map((post, index) => (
-          <div key={post.id} className="w-full h-full">
-            <ReelPost
-              post={post}
-              isActive={index === currentIndex}
-              onLike={onLike}
-              onComment={onComment}
-              onDuet={onDuet}
-              onFollow={onFollow}
-              onSavePost={onSavePost}
-              onSharePost={onSharePost}
-              onViewProfile={onViewProfile}
-            />
+      {/* Loading State */}
+      {isLoading && (
+        <div className="absolute top-24 left-0 right-0 bottom-0 flex items-center justify-center">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p>Loading feed...</p>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      {/* Progress Indicator */}
-      <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-30">
-        <div className="flex flex-col space-y-1">
-          {posts.map((_, index) => (
-            <button
-              key={index}
-              className={`w-1 h-6 rounded-full transition-all duration-300 ${
-                index === currentIndex 
-                  ? 'bg-white' 
-                  : 'bg-white/30'
-              }`}
-              onClick={() => {
-                setCurrentIndex(index);
-                scrollToPost(index);
-              }}
-            />
+      {/* Error State */}
+      {error && !isLoading && (
+        <div className="absolute top-24 left-0 right-0 bottom-0 flex items-center justify-center">
+          <div className="text-white text-center">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Feed - Scrollable Container */}
+      {!isLoading && !error && (
+        <div 
+          ref={containerRef}
+          className="absolute top-24 left-0 right-0 bottom-0 overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+          onScroll={handleScroll}
+          style={{ scrollBehavior: 'smooth' }}
+        >
+          {displayPosts.map((post, index) => (
+            <div key={post.id} className="w-full h-full">
+              <ReelPost
+                post={post}
+                isActive={index === currentIndex}
+                onLike={onLike}
+                onComment={onComment}
+                onDuet={onDuet}
+                onFollow={onFollow}
+                onSavePost={onSavePost}
+                onSharePost={onSharePost}
+                onViewProfile={onViewProfile}
+              />
+            </div>
           ))}
         </div>
-      </div>
+      )}
+
+      {/* Progress Indicator */}
+      {!isLoading && !error && displayPosts.length > 0 && (
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-30">
+          <div className="flex flex-col space-y-1">
+            {displayPosts.map((_, index) => (
+              <button
+                key={index}
+                className={`w-1 h-6 rounded-full transition-all duration-300 ${
+                  index === currentIndex 
+                    ? 'bg-white' 
+                    : 'bg-white/30'
+                }`}
+                onClick={() => {
+                  setCurrentIndex(index);
+                  scrollToPost(index);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

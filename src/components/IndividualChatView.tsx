@@ -1,19 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Send, Camera, Smile, Plus, Image, Heart, MessageCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Send, Plus, Smile, Camera, Mic, Heart, MoreVertical, Phone, Video, Info } from 'lucide-react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-
-interface Message {
-  id: string;
-  content: string;
-  senderId: string;
-  timestamp: number;
-  type: 'text' | 'image' | 'video';
-  imageUrl?: string;
-  isLiked?: boolean;
-}
+import { socketService } from '../services/socket';
 
 interface User {
   id: string;
@@ -21,9 +11,16 @@ interface User {
   displayName: string;
   avatar: string;
   isOnline: boolean;
-  bio?: string;
-  mutualFriends?: number;
   lastSeen?: string;
+}
+
+interface Message {
+  id: string;
+  content: string;
+  senderId: string;
+  timestamp: number;
+  type: 'text' | 'image' | 'voice';
+  isLiked?: boolean;
 }
 
 interface IndividualChatViewProps {
@@ -35,122 +32,169 @@ interface IndividualChatViewProps {
 export function IndividualChatView({ user, onBack, onViewProfile }: IndividualChatViewProps) {
   const [messageText, setMessageText] = useState('');
   const [showAttachments, setShowAttachments] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [messages, setMessages] = useState([]);
+  const messagesEndRef = useRef(null);
 
-  // Sample messages for the chat
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Hey! Just saw your latest SnapCap post 📸',
-      senderId: user.id,
-      timestamp: Date.now() - 3600000,
-      type: 'text'
-    },
-    {
-      id: '2',
-      content: 'Thanks! I was experimenting with the lighting ✨',
-      senderId: 'me',
-      timestamp: Date.now() - 3300000,
-      type: 'text'
-    },
-    {
-      id: '3',
-      content: 'Your photography skills are incredible! The composition is perfect 🎯',
-      senderId: user.id,
-      timestamp: Date.now() - 3000000,
-      type: 'text',
-      isLiked: true
-    },
-    {
-      id: '4',
-      content: 'We should do a photo walk together sometime! I know some amazing spots around the city 🌆',
-      senderId: user.id,
-      timestamp: Date.now() - 2700000,
-      type: 'text'
-    },
-    {
-      id: '5',
-      content: 'That sounds amazing! I would love to explore new places 🗺️',
-      senderId: 'me',
-      timestamp: Date.now() - 2400000,
-      type: 'text'
-    },
-    {
-      id: '6',
-      content: 'Perfect! How about this weekend? The weather looks great for outdoor photography ☀️',
-      senderId: user.id,
-      timestamp: Date.now() - 600000,
-      type: 'text'
-    }
-  ]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Load real messages when component mounts
   useEffect(() => {
-    scrollToBottom();
+    // ensure socket is connected
+    socketService.connect();
+
+    const loadMessages = async () => {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5001/api/friends/${(user.id || '').toString()}/messages`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const messagesData = await response.json();
+          console.log('✅ Loaded messages:', messagesData);
+          
+          // Transform messages to match frontend format
+          const transformedMessages = messagesData.map((msg: any) => ({
+            id: msg._id,
+            content: msg.content,
+            senderId: msg.sender,
+            timestamp: new Date(msg.createdAt).getTime(),
+            type: msg.type || 'text'
+          }));
+          setMessages(transformedMessages);
+        } else {
+          console.error('Failed to load messages:', response.status);
+          // Use empty array instead of sample messages for now
+          setMessages([]);
+        }
+      } catch (error) {
+        console.error('Error loading messages:', error);
+        setMessages([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadMessages();
+
+    // Subscribe to realtime messages for this user
+    const offNewMessage = socketService.onNewMessage((data: any) => {
+      if (data?.sender === user.id || data?.receiver === user.id) {
+        setMessages(prev => [...prev, {
+          id: data._id || `rt-${Date.now()}`,
+          content: data.content,
+          senderId: data.sender,
+          timestamp: new Date(data.createdAt || Date.now()).getTime(),
+          type: data.type || 'text'
+        }]);
+      }
+    });
+
+    return () => {
+      offNewMessage?.();
+    };
+  }, [user.id]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
-    });
-  };
-
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const getCurrentUserId = () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return user.id;
     }
+    return null;
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!messageText.trim()) return;
     
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: messageText,
-      senderId: 'me',
+    const messageContent = messageText.trim();
+    setMessageText('');
+
+    // Create optimistic message
+    const optimisticMessage: Message = {
+      id: `temp-${Date.now()}`,
+      content: messageContent,
+      senderId: getCurrentUserId() || 'me',
       timestamp: Date.now(),
       type: 'text'
     };
     
-    setMessages(prev => [...prev, newMessage]);
-    setMessageText('');
-  };
+    // Add optimistic message immediately
+    setMessages(prev => [...prev, optimisticMessage]);
 
-  const likeMessage = (messageId: string) => {
+    try {
+      // Send message to backend using the correct endpoint
+      const response = await fetch(`http://localhost:5001/api/friends/${(user.id || '').toString()}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          content: messageContent,
+          type: 'text'
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Message sent successfully:', result);
+        
+        // Replace optimistic message with real message
     setMessages(prev => prev.map(msg => 
-      msg.id === messageId ? { ...msg, isLiked: !msg.isLiked } : msg
-    ));
+          msg.id === optimisticMessage.id 
+            ? { ...result, id: result._id, senderId: result.sender, timestamp: new Date(result.createdAt).getTime() }
+            : msg
+        ));
+
+        // Emit socket notification for listeners
+        try {
+          socketService.emitMessageSent(result.conversation || '', user.id, result._id);
+        } catch (e) {}
+      } else {
+        console.error('❌ Failed to send message:', response.status);
+        // Remove optimistic message on failure
+        setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+        setMessageText(messageContent); // Restore message text
+      }
+    } catch (error) {
+      console.error('❌ Error sending message:', error);
+      // Remove optimistic message on failure
+      setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+      setMessageText(messageContent); // Restore message text
+    }
   };
 
-  // Group messages by date
-  const groupedMessages = messages.reduce((groups: { [date: string]: Message[] }, message) => {
-    const date = formatDate(message.timestamp);
-    if (!groups[date]) {
-      groups[date] = [];
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
-    groups[date].push(message);
-    return groups;
-  }, {});
+  };
+
+  const formatTime = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
-    <div className="w-full h-full bg-black flex flex-col">
+    <motion.div
+      className="fixed inset-0 bg-black z-50 flex flex-col"
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10 bg-black/90 backdrop-blur-md">
+      <div className="bg-black/90 backdrop-blur-md border-b border-white/10 p-4">
+        <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <button
             onClick={onBack}
@@ -159,31 +203,33 @@ export function IndividualChatView({ user, onBack, onViewProfile }: IndividualCh
             <ArrowLeft className="w-6 h-6" />
           </button>
           
-          <div 
-            className="flex items-center space-x-3 cursor-pointer hover:bg-white/5 rounded-lg p-2 -m-2 transition-colors"
+            <button
             onClick={() => onViewProfile(user.id)}
+              className="flex items-center space-x-3 hover:bg-white/10 rounded-lg p-2 transition-colors"
           >
             <div className="relative">
+                <div className="w-10 h-10 rounded-full overflow-hidden">
               <ImageWithFallback
                 src={user.avatar}
                 alt={user.displayName}
-                className="w-10 h-10 rounded-full object-cover"
+                    className="w-full h-full object-cover"
               />
+                </div>
               {user.isOnline && (
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-black" />
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-black" />
               )}
             </div>
             
-            <div>
+              <div className="text-left">
               <h3 className="text-white font-semibold">{user.displayName}</h3>
               <p className="text-white/60 text-sm">
-                {user.isOnline ? 'Active now' : user.lastSeen || 'Active 2h ago'}
+                  {user.isOnline ? 'Active now' : user.lastSeen || 'Last seen recently'}
               </p>
             </div>
-          </div>
+            </button>
         </div>
         
-        <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-2">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
             <Phone className="w-5 h-5" />
           </Button>
@@ -191,89 +237,47 @@ export function IndividualChatView({ user, onBack, onViewProfile }: IndividualCh
             <Video className="w-5 h-5" />
           </Button>
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
-            <MoreVertical className="w-5 h-5" />
+              <Info className="w-5 h-5" />
           </Button>
+          </div>
         </div>
       </div>
       
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {Object.entries(groupedMessages).map(([date, dateMessages]) => (
-          <div key={date} className="space-y-4">
-            {/* Date separator */}
-            <div className="flex items-center justify-center">
-              <div className="bg-white/10 text-white/70 text-xs px-3 py-1 rounded-full">
-                {date}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {isLoading ? (
+          <div className="flex justify-center items-center h-full">
+            <div className="text-white/60">Loading messages...</div>
               </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-4">
+              <Send className="w-8 h-8 text-white/40" />
             </div>
-            
-            {/* Messages for this date */}
-            {dateMessages.map((message, index) => {
-              const isFromMe = message.senderId === 'me';
-              const prevMessage = index > 0 ? dateMessages[index - 1] : null;
-              const isFirstInGroup = !prevMessage || prevMessage.senderId !== message.senderId;
-              
-              return (
-                <motion.div
+            <h3 className="text-white text-xl font-semibold mb-2">No messages yet</h3>
+            <p className="text-white/60">Start the conversation with {user.displayName}</p>
+          </div>
+        ) : (
+          messages.map((message) => (
+            <div
                   key={message.id}
-                  className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <div className={`flex ${isFromMe ? 'flex-row-reverse' : 'flex-row'} items-end space-x-2 max-w-xs`}>
-                    {/* Avatar (only show for first message in group) */}
-                    {!isFromMe && isFirstInGroup && (
-                      <ImageWithFallback
-                        src={user.avatar}
-                        alt={user.displayName}
-                        className="w-6 h-6 rounded-full object-cover"
-                      />
-                    )}
-                    {!isFromMe && !isFirstInGroup && (
-                      <div className="w-6" />
-                    )}
-                    
-                    <div className={`group relative ${isFromMe ? 'ml-2' : 'mr-2'}`}>
-                      {/* Message bubble */}
-                      <div className={`px-4 py-2 rounded-2xl max-w-xs break-words ${
-                        isFromMe
-                          ? 'bg-blue-500 text-white rounded-br-md'
-                          : 'bg-white/10 text-white rounded-bl-md'
-                      } ${!isFirstInGroup ? (isFromMe ? 'rounded-tr-2xl' : 'rounded-tl-2xl') : ''}`}>
-                        <p className="text-sm leading-relaxed">{message.content}</p>
-                        
-                        {/* Timestamp */}
-                        <p className={`text-xs mt-1 ${
-                          isFromMe ? 'text-blue-100' : 'text-white/50'
-                        }`}>
-                          {formatTime(message.timestamp)}
-                        </p>
-                      </div>
-                      
-                      {/* Like button */}
-                      <button
-                        onClick={() => likeMessage(message.id)}
-                        className={`absolute -bottom-1 ${isFromMe ? '-left-6' : '-right-6'} opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/70 rounded-full p-1`}
-                      >
-                        <Heart 
-                          className={`w-3 h-3 ${message.isLiked ? 'text-red-500 fill-red-500' : 'text-white/60'}`} 
-                        />
-                      </button>
-                      
-                      {/* Like indicator */}
-                      {message.isLiked && (
-                        <div className={`absolute -bottom-2 ${isFromMe ? 'left-0' : 'right-0'} bg-red-500 rounded-full p-1`}>
-                          <Heart className="w-2 h-2 text-white fill-white" />
-                        </div>
-                      )}
+              className={`flex ${
+                message.senderId === getCurrentUserId() ? 'justify-end' : 'justify-start'
+              }`}
+            >
+              <div
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                  message.senderId === getCurrentUserId()
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white/10 text-white'
+                }`}
+              >
+                <p className="break-words">{message.content}</p>
+                <p className="text-xs opacity-60 mt-1">{formatTime(message.timestamp)}</p>
                     </div>
                   </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        ))}
+          ))
+        )}
         <div ref={messagesEndRef} />
       </div>
       
@@ -281,70 +285,70 @@ export function IndividualChatView({ user, onBack, onViewProfile }: IndividualCh
       <AnimatePresence>
         {showAttachments && (
           <motion.div
-            className="px-4 pb-2"
+            className="absolute bottom-20 left-4 right-4 bg-white/10 backdrop-blur-md rounded-2xl p-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
           >
-            <div className="flex items-center space-x-4 bg-white/10 rounded-2xl p-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/20 rounded-full"
-              >
-                <Image className="w-5 h-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/20 rounded-full"
-              >
-                <Camera className="w-5 h-5" />
-              </Button>
+            <div className="grid grid-cols-4 gap-4">
+              <button className="flex flex-col items-center space-y-2 p-3 hover:bg-white/10 rounded-xl transition-colors">
+                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-white text-xs">Camera</span>
+              </button>
+              
+              <button className="flex flex-col items-center space-y-2 p-3 hover:bg-white/10 rounded-xl transition-colors">
+                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                  <Mic className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-white text-xs">Voice</span>
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
       
-      {/* Message Input */}
-      <div className="p-4 border-t border-white/10 bg-black/90 backdrop-blur-md">
-        <div className="flex items-center space-x-3">
+      {/* Input */}
+      <div className="bg-black/90 backdrop-blur-md border-t border-white/10 p-4">
+        <div className="flex items-end space-x-3">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="text-white hover:bg-white/10"
+            className="text-white hover:bg-white/10 flex-shrink-0"
             onClick={() => setShowAttachments(!showAttachments)}
           >
             <Plus className="w-5 h-5" />
           </Button>
           
-          <div className="flex-1 relative">
-            <Input
+          <div className="flex-1 bg-white/10 rounded-2xl flex items-end">
+            <textarea
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
-              placeholder="Message..."
-              className="bg-white/10 border-white/20 text-white placeholder-white/60 pr-12 rounded-2xl"
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              onKeyPress={handleKeyPress}
+              placeholder={`Message ${user.displayName}...`}
+              className="flex-1 bg-transparent text-white placeholder-white/60 p-3 resize-none max-h-32 min-h-[44px] outline-none"
+              rows={1}
             />
+            
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white hover:bg-white/10"
+              className="text-white hover:bg-white/10 m-1 flex-shrink-0"
             >
-              <Smile className="w-4 h-4" />
+              <Smile className="w-5 h-5" />
             </Button>
           </div>
           
           <Button
             onClick={sendMessage}
+            className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-3 flex-shrink-0"
             disabled={!messageText.trim()}
-            className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-full"
-            size="icon"
           >
             <Send className="w-5 h-5" />
           </Button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

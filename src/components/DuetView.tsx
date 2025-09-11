@@ -54,7 +54,7 @@ export function DuetView({ duets = mockDuets, onClose, onCreateDuet, selectedPos
   const [isCreating, setIsCreating] = useState(!!selectedPostId);
   const [duetText, setDuetText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
-  const [likedDuets, setLikedDuets] = useState<Set<string>>(new Set(['1']));
+  const [likedDuets, setLikedDuets] = useState(new Set(['1']));
 
   const handleLike = (duetId: string) => {
     const newLikedDuets = new Set(likedDuets);

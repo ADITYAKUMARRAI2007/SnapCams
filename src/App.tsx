@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MapView } from "./components/MapView";
+import MapboxMapView from "./components/MapboxMapView";
 import { CameraView } from "./components/CameraView";
 import { FeedView } from "./components/FeedView";
 import { DuetView } from "./components/DuetView";
@@ -18,6 +18,7 @@ import { ShareModal } from "./components/ShareModal";
 import { StoryUploadView } from "./components/StoryUploadView";
 import { FollowersModal } from "./components/FollowersModal";
 import { LiquidEtherBackground } from "./components/LiquidEtherBackground";
+import { ImageUploadFlow } from "./components/ImageUploadFlow";
 import { motion, AnimatePresence } from "motion/react";
 import { MessageCircle, Settings } from "lucide-react";
 
@@ -102,9 +103,15 @@ interface ShareContent {
 }
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState({
+    id: "aditya_kumar",
+    email: "aditya@example.com",
+    username: "aditya_kumar"
+  });
   const [currentTab, setCurrentTab] = useState("feed");
   const [showCamera, setShowCamera] = useState(false);
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
   const [showDuets, setShowDuets] = useState(false);
   const [showStories, setShowStories] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
@@ -116,12 +123,12 @@ export default function App() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showStoryUpload, setShowStoryUpload] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
-  const [followersModalType, setFollowersModalType] = useState<"followers" | "following">("followers");
-  const [shareContent, setShareContent] = useState<ShareContent | null>(null);
-  const [selectedChatUser, setSelectedChatUser] = useState<AppUser | null>(null);
-  const [selectedProfileUser, setSelectedProfileUser] = useState<AppUser | null>(null);
-  const [previousModal, setPreviousModal] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<AppUser>({
+  const [followersModalType, setFollowersModalType] = useState("followers");
+  const [shareContent, setShareContent] = useState(null);
+  const [selectedChatUser, setSelectedChatUser] = useState(null);
+  const [selectedProfileUser, setSelectedProfileUser] = useState(null);
+  const [previousModal, setPreviousModal] = useState(null);
+  const [userProfile, setUserProfile] = useState({
     id: "you",
     username: "you",
     displayName: "You",
@@ -137,15 +144,29 @@ export default function App() {
     email: "you@example.com",
     phone: "+1 (555) 123-4567",
   });
-  const [selectedPostForDuet, setSelectedPostForDuet] = useState<string | null>(null);
-  const [selectedPostForComments, setSelectedPostForComments] = useState<string | null>(null);
+
+  // Map UI aliases/usernames to real MongoDB ObjectIds used by backend
+  const aliasToObjectId: Record<string, string> = {
+    alexandra_dreams: '68c16d7ed3ffa114b597f1fe',
+    cosmic_wanderer: '68c16d7ed3ffa114b597f1ff',
+    urban_explorer: '68c16d7ed3ffa114b597f1fe',
+    street_artist: '68c16d7ed3ffa114b597f1ff'
+  };
+
+  const getRealFriendId = (idOrAlias: string): string => {
+    if (idOrAlias && idOrAlias.length === 24) return idOrAlias; // already ObjectId
+    const key = (idOrAlias || '').toLowerCase();
+    return aliasToObjectId[key] || '68c16d7ed3ffa114b597f1fe';
+  };
+  const [selectedPostForDuet, setSelectedPostForDuet] = useState(null);
+  const [selectedPostForComments, setSelectedPostForComments] = useState(null);
   const [userStreak, setUserStreak] = useState(7);
-  const [savedPosts, setSavedPosts] = useState<Pin[]>([]);
+  const [savedPosts, setSavedPosts] = useState([]);
   const [userProfilePic, setUserProfilePic] = useState(
     "https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080",
   );
 
-  const [pins, setPins] = useState<Pin[]>([
+  const [pins, setPins] = useState([
     {
       id: "1",
       x: 25,
@@ -260,7 +281,7 @@ export default function App() {
     },
   ]);
 
-  const [stories, setStories] = useState<Story[]>([
+  const [stories, setStories] = useState([
     {
       id: "story1",
       author: "alexandra_dreams",
@@ -369,7 +390,7 @@ export default function App() {
   const [sampleFollowers] = useState(generateSampleFollowers());
 
   // Sample users for profiles and chats
-  const [sampleUsers] = useState<AppUser[]>([
+  const [sampleUsers] = useState([
     {
       id: "alexandra_dreams",
       username: "alexandra_dreams",
@@ -474,31 +495,15 @@ export default function App() {
     }
   };
 
-  const handleCameraCapture = (photo: {
+  const handleCameraCapture = async (photo: {
     image: string;
     caption: string;
     hashtags: string[];
   }) => {
-    const newPin: Pin = {
-      id: Date.now().toString(),
-      x: Math.random() * 70 + 15,
-      y: Math.random() * 70 + 15,
-      image: photo.image,
-      caption: photo.caption,
-      hashtags: photo.hashtags,
-      likes: 0,
-      comments: 0,
-      author: "you",
-      authorAvatar:
-        "https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      streak: userStreak + 1,
-      timestamp: Date.now(),
-    };
-
-    setPins((prevPins) => [newPin, ...prevPins]);
-    setUserStreak((prev) => prev + 1);
+    // Store the captured photo and open ImageUploadFlow for AI caption generation
+    setCapturedPhoto(photo);
     setShowCamera(false);
-    setCurrentTab("map");
+    setShowImageUpload(true);
   };
 
   const handleCameraStoryUpload = (photo: {
@@ -535,7 +540,28 @@ export default function App() {
     setCurrentTab("feed");
   };
 
-  const handleLike = (postId: string) => {
+  const handleLike = async (postId: string) => {
+    try {
+      // Send like to backend
+      const response = await fetch(`http://localhost:5001/api/posts/${postId}/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Post liked successfully:', result);
+      } else {
+        console.error('❌ Failed to like post:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error liking post:', error);
+    }
+
+    // Update local state for immediate UI feedback
     setPins((prevPins) =>
       prevPins.map((pin) =>
         pin.id === postId ? { ...pin, likes: pin.likes + 1 } : pin,
@@ -617,8 +643,20 @@ export default function App() {
     console.log("Adding friend:", friendId);
   };
 
-  const handleMessageFriend = (friendId: string) => {
-    const chatUser = sampleUsers.find((u) => u.id === friendId);
+  const handleMessageFriend = (friendOrId: any) => {
+    // Accept either a friend object or an id
+    const friendIdRaw = typeof friendOrId === 'string' ? friendOrId : friendOrId?.id;
+    const realId = getRealFriendId(friendIdRaw);
+    const baseUser = sampleUsers.find((u) => u.id === friendIdRaw) || (typeof friendOrId === 'object' && friendOrId ? {
+      id: realId,
+      username: friendOrId.username || friendIdRaw,
+      displayName: friendOrId.displayName || friendOrId.username || 'Friend',
+      avatar: friendOrId.avatar || "https://avatars.githubusercontent.com/u/9919?v=4",
+      isOnline: friendOrId.isOnline ?? true,
+      lastSeen: friendOrId.lastSeen || 'recently'
+    } : null);
+    // Ensure we pass a user object whose id is a valid Mongo ObjectId
+    const chatUser = baseUser ? { ...baseUser, id: realId } as any : null;
     if (chatUser) {
       // Track which modal was open before opening chat
       if (showFollowersModal) {
@@ -635,7 +673,7 @@ export default function App() {
       
       // Small delay to allow modal close animation before opening chat
       setTimeout(() => {
-        setSelectedChatUser(chatUser);
+        setSelectedChatUser(chatUser as any);
         setShowIndividualChat(true);
       }, 150);
     }
@@ -737,8 +775,19 @@ export default function App() {
   };
 
   const handleSaveProfile = (profileData: any) => {
+    // Update in-memory profile model (drives Profile header/UI)
     setUserProfile((prev) => ({ ...prev, ...profileData }));
     setUserProfilePic(profileData.avatar);
+
+    // Keep the logged-in user object in sync for other screens
+    setUser((prev: any) => prev ? { ...prev, displayName: profileData.displayName, avatar: profileData.avatar } : prev);
+
+    // Persist to localStorage so it survives reloads
+    try {
+      const stored = JSON.parse(localStorage.getItem('user') || '{}');
+      localStorage.setItem('user', JSON.stringify({ ...stored, ...profileData }));
+    } catch (_) {}
+
     setShowEditProfile(false);
   };
 
@@ -812,12 +861,8 @@ export default function App() {
         );
       case "map":
         return (
-          <MapView
-            onCameraClick={() => setShowCamera(true)}
-            pins={pins}
-            onPinClick={handlePinClick}
-            userStreak={userStreak}
-            onSettingsClick={() => setShowSettings(true)}
+          <MapboxMapView
+            onClose={() => setCurrentTab("feed")}
           />
         );
       case "friends":
@@ -962,6 +1007,36 @@ export default function App() {
             onCapture={handleCameraCapture}
             onStoryUpload={handleCameraStoryUpload}
             userStreak={userStreak}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Image Upload Flow */}
+      <AnimatePresence>
+        {showImageUpload && (
+          <ImageUploadFlow
+            onClose={() => {
+              setShowImageUpload(false);
+              setCapturedPhoto(null);
+            }}
+            onPostCreated={(post) => {
+              console.log('Post created:', post);
+              setShowImageUpload(false);
+              setCapturedPhoto(null);
+              setPins(prev => [post, ...prev]);
+            }}
+            onStoryCreated={(story) => {
+              console.log('Story created:', story);
+              setShowImageUpload(false);
+              setCapturedPhoto(null);
+              setStories(prev => [story, ...prev]);
+            }}
+            userLocation={{
+              lat: 37.7749,
+              lng: -122.4194,
+              name: "San Francisco, CA"
+            }}
+            capturedPhoto={capturedPhoto}
           />
         )}
       </AnimatePresence>

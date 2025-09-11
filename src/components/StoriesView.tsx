@@ -257,7 +257,7 @@ export function StoriesView({ stories, onClose, currentUser }: StoriesViewProps)
 
           {/* Hashtags */}
           <div className="flex flex-wrap gap-2 mb-4">
-            {currentContent.hashtags.map((tag, index) => (
+            {currentContent.hashtags?.map((tag, index) => (
               <motion.span
                 key={tag}
                 className="text-purple-300 font-medium"

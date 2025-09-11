@@ -27,10 +27,14 @@ interface ProfileViewProps {
 
 export function ProfileView({ stats, posts, savedPosts, onCameraClick, onLogout, onProfilePicChange, onEditProfile, onShareProfile, onViewFollowers, onViewFollowing }: ProfileViewProps) {
   const [showMenu, setShowMenu] = useState(false);
-  const [currentTab, setCurrentTab] = useState<'posts' | 'saved'>('posts');
+  const [currentTab, setCurrentTab] = useState('posts');
   const [showProfilePicModal, setShowProfilePicModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   
   const [profilePic, setProfilePic] = useState('https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080');
+  
+  // File input ref for custom upload
+  const fileInputRef = React.useRef(null);
 
   const sampleProfilePictures = [
     'https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
@@ -47,8 +51,43 @@ export function ProfileView({ stats, posts, savedPosts, onCameraClick, onLogout,
     setShowProfilePicModal(false);
   };
 
+  const handleCustomUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = (event: any) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+
+      // Create object URL for preview
+      const imageUrl = URL.createObjectURL(file);
+      setProfilePic(imageUrl);
+      onProfilePicChange(imageUrl);
+      setShowProfilePicModal(false);
+    }
+  };
+
   return (
     <div className="w-full h-full bg-black overflow-y-auto scrollbar-hide">
+      {/* Hidden file input for custom upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
       <div className="p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -136,7 +175,7 @@ export function ProfileView({ stats, posts, savedPosts, onCameraClick, onLogout,
         {/* Action Buttons */}
         <div className="flex space-x-2 mb-6">
           <button 
-            onClick={onEditProfile}
+            onClick={() => setShowEditProfileModal(true)}
             className="flex-1 bg-white/10 text-white py-2 rounded-lg font-medium hover:bg-white/20 transition-colors"
           >
             <Edit className="w-4 h-4 inline mr-2" />
@@ -296,7 +335,7 @@ export function ProfileView({ stats, posts, savedPosts, onCameraClick, onLogout,
 
               <div className="flex space-x-3">
                 <button
-                  onClick={() => setShowProfilePicModal(false)}
+                  onClick={handleCustomUpload}
                   className="flex-1 bg-white/10 text-white py-3 rounded-lg font-medium hover:bg-white/20 transition-colors flex items-center justify-center space-x-2"
                 >
                   <Upload className="w-4 h-4" />
@@ -308,6 +347,92 @@ export function ProfileView({ stats, posts, savedPosts, onCameraClick, onLogout,
                 >
                   <Camera className="w-4 h-4" />
                   <span>Take Photo</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Profile Modal */}
+      <AnimatePresence>
+        {showEditProfileModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-900 rounded-2xl p-6 w-full max-w-md"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-white text-xl font-semibold">Edit Profile</h2>
+                <button
+                  onClick={() => setShowEditProfileModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">Display Name</label>
+                  <input
+                    type="text"
+                    defaultValue="ADI"
+                    className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">Bio</label>
+                  <textarea
+                    defaultValue="Living life to the fullest! 📸✨"
+                    rows={3}
+                    className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">Location</label>
+                  <input
+                    type="text"
+                    defaultValue="New York, NY"
+                    className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">Website</label>
+                  <input
+                    type="url"
+                    defaultValue="https://example.com"
+                    className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => setShowEditProfileModal(false)}
+                  className="flex-1 bg-gray-700 text-white py-3 rounded-lg font-medium hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // Here you would save the profile changes
+                    setShowEditProfileModal(false);
+                    // You could add a toast notification here
+                  }}
+                  className="flex-1 bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors"
+                >
+                  Save Changes
                 </button>
               </div>
             </motion.div>

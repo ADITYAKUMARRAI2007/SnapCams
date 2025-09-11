@@ -4,6 +4,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Sparkles, Shield } from 'lucide-react';
+import { apiService } from '../services/api';
+import { socketService } from '../services/socket';
 
 interface AuthViewProps {
   onAuthComplete: (user: { id: string; email: string; username: string }) => void;
@@ -13,26 +15,73 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     username: '',
+    displayName: '',
     confirmPassword: ''
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock successful authentication
-    onAuthComplete({
-      id: '1',
-      email: formData.email,
-      username: formData.username || formData.email.split('@')[0]
-    });
+    try {
+      if (isLogin) {
+        // Login
+        const response = await apiService.login({
+          email: formData.email,
+          password: formData.password
+        });
+
+        if (response.success && response.data) {
+          // Connect to Socket.IO
+          await socketService.connect();
+          
+          onAuthComplete({
+            id: response.data.user.id,
+            email: response.data.user.username, // Using username as email for compatibility
+            username: response.data.user.username
+          });
+        } else {
+          setError(response.message || 'Login failed');
+        }
+      } else {
+        // Register
+        if (formData.password !== formData.confirmPassword) {
+          setError('Passwords do not match');
+          return;
+        }
+
+        const response = await apiService.register({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          displayName: formData.displayName || formData.username
+        });
+
+        if (response.success && response.data) {
+          // Connect to Socket.IO
+          await socketService.connect();
+          
+          onAuthComplete({
+            id: response.data.user.id,
+            email: response.data.user.username, // Using username as email for compatibility
+            username: response.data.user.username
+          });
+        } else {
+          setError(response.message || 'Registration failed');
+        }
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -58,7 +107,7 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
   ];
 
   return (
-    <div className="min-h-screen flex bg-black">
+    <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left Side - Branding & Features */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black" />
@@ -101,21 +150,48 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
         </div>
       </div>
 
-      {/* Right Side - Auth Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-md">
-          {/* Mobile Branding */}
-          <div className="lg:hidden flex items-center justify-center space-x-3 mb-12">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center">
-              <span className="text-white font-bold">S</span>
-            </div>
-            <h1 className="text-xl font-bold text-white">
-              SnapCap
-            </h1>
+      {/* Mobile Features Section */}
+      <div className="lg:hidden bg-gradient-to-br from-gray-900 to-black p-6 pb-8">
+        <div className="flex items-center justify-center space-x-3 mb-6">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center">
+            <span className="text-white font-bold">S</span>
           </div>
+          <h1 className="text-xl font-bold text-white">
+            SnapCap
+          </h1>
+        </div>
+        
+        <h2 className="text-2xl font-bold text-white mb-3 text-center leading-tight">
+          Capture moments, share your story
+        </h2>
+        
+        <p className="text-gray-300 text-center mb-6 leading-relaxed">
+          Connect with friends and share your memories
+        </p>
 
+        <div className="grid grid-cols-1 gap-4">
+          {features.map((feature, index) => (
+            <div
+              key={feature.title}
+              className="flex items-center space-x-3 bg-white/5 rounded-lg p-3 border border-white/10"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
+                <feature.icon className="w-4 h-4 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-medium text-sm">{feature.title}</h3>
+                <p className="text-gray-400 text-xs">{feature.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right Side - Auth Form */}
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-12">
+        <div className="w-full max-w-md">
           {/* Tab Switcher */}
-          <div className="bg-gray-900/50 rounded-xl p-1 mb-8">
+          <div className="bg-gray-900/50 rounded-xl p-1 mb-6 lg:mb-8">
             <div className="flex">
               <button
                 className={`flex-1 py-3 px-4 text-sm font-medium rounded-lg transition-all ${
@@ -148,12 +224,12 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold text-white mb-2">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                <div className="text-center mb-6 lg:mb-8">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
                     {isLogin ? 'Welcome back' : 'Create your account'}
                   </h2>
-                  <p className="text-gray-400">
+                  <p className="text-gray-400 text-sm sm:text-base">
                     {isLogin 
                       ? 'Log in to see photos and videos from friends' 
                       : 'Sign up to see photos and videos from your friends'
@@ -166,20 +242,38 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="space-y-2"
+                    className="space-y-4"
                   >
-                    <Label htmlFor="username" className="text-white">Username</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <Input
-                        id="username"
-                        type="text"
-                        placeholder="Enter your username"
-                        value={formData.username}
-                        onChange={(e) => handleInputChange('username', e.target.value)}
-                        className="glass border-white/10 text-white placeholder-gray-400 pl-12 h-12 focus:border-indigo-500 focus:ring-indigo-500/20"
-                        required={!isLogin}
-                      />
+                    <div className="space-y-2">
+                      <Label htmlFor="displayName" className="text-white">Display Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <Input
+                          id="displayName"
+                          type="text"
+                          placeholder="Enter your display name"
+                          value={formData.displayName}
+                          onChange={(e) => handleInputChange('displayName', e.target.value)}
+                          className="glass border-white/10 text-white placeholder-gray-400 pl-12 h-11 sm:h-12 focus:border-indigo-500 focus:ring-indigo-500/20 text-sm sm:text-base"
+                          required={!isLogin}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-white">Username</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <Input
+                          id="username"
+                          type="text"
+                          placeholder="Enter your username"
+                          value={formData.username}
+                          onChange={(e) => handleInputChange('username', e.target.value)}
+                          className="glass border-white/10 text-white placeholder-gray-400 pl-12 h-11 sm:h-12 focus:border-indigo-500 focus:ring-indigo-500/20 text-sm sm:text-base"
+                          required={!isLogin}
+                        />
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -194,7 +288,7 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
                       placeholder="Enter your email"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
-                      className="glass border-white/10 text-white placeholder-gray-400 pl-12 h-12 focus:border-indigo-500 focus:ring-indigo-500/20"
+                      className="glass border-white/10 text-white placeholder-gray-400 pl-12 h-11 sm:h-12 focus:border-indigo-500 focus:ring-indigo-500/20 text-sm sm:text-base"
                       required
                     />
                   </div>
@@ -210,7 +304,7 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
                       placeholder="Enter your password"
                       value={formData.password}
                       onChange={(e) => handleInputChange('password', e.target.value)}
-                      className="glass border-white/10 text-white placeholder-gray-400 pl-12 pr-12 h-12 focus:border-indigo-500 focus:ring-indigo-500/20"
+                      className="glass border-white/10 text-white placeholder-gray-400 pl-12 pr-12 h-11 sm:h-12 focus:border-indigo-500 focus:ring-indigo-500/20 text-sm sm:text-base"
                       required
                     />
                     <button
@@ -239,7 +333,7 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
                         placeholder="Confirm your password"
                         value={formData.confirmPassword}
                         onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                        className="glass border-white/10 text-white placeholder-gray-400 pl-12 h-12 focus:border-indigo-500 focus:ring-indigo-500/20"
+                        className="glass border-white/10 text-white placeholder-gray-400 pl-12 h-11 sm:h-12 focus:border-indigo-500 focus:ring-indigo-500/20 text-sm sm:text-base"
                         required={!isLogin}
                       />
                     </div>
@@ -257,10 +351,20 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
                   </div>
                 )}
 
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg"
+                  >
+                    <p className="text-red-400 text-sm">{error}</p>
+                  </motion.div>
+                )}
+
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                  className="w-full h-11 sm:h-12 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50 text-sm sm:text-base"
                 >
                   {isLoading ? (
                     <span>{isLogin ? 'Logging in...' : 'Signing up...'}</span>
@@ -278,13 +382,13 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Button
                     type="button"
                     variant="outline"
-                    className="glass border-white/10 text-white hover:bg-white/5 h-12"
+                    className="glass border-white/10 text-white hover:bg-white/5 h-11 sm:h-12 text-sm sm:text-base"
                   >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                       <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -295,9 +399,9 @@ export function AuthView({ onAuthComplete }: AuthViewProps) {
                   <Button
                     type="button"
                     variant="outline"
-                    className="glass border-white/10 text-white hover:bg-white/5 h-12"
+                    className="glass border-white/10 text-white hover:bg-white/5 h-11 sm:h-12 text-sm sm:text-base"
                   >
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                     </svg>
                     Facebook

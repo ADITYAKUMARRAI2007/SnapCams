@@ -25,7 +25,7 @@ interface ProfileData {
 }
 
 export function EditProfileView({ onBack, onSave, currentProfile }: EditProfileViewProps) {
-  const [formData, setFormData] = useState<ProfileData>(currentProfile);
+  const [formData, setFormData] = useState(currentProfile);
   const [isLoading, setIsLoading] = useState(false);
   const [showAvatarOptions, setShowAvatarOptions] = useState(false);
 
@@ -36,11 +36,54 @@ export function EditProfileView({ onBack, onSave, currentProfile }: EditProfileV
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      onSave(formData);
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const response = await fetch(`http://localhost:5001/api/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          displayName: formData.displayName,
+          bio: formData.bio,
+          location: formData.location,
+          website: formData.website,
+          avatar: formData.avatar
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Profile updated successfully:', result);
+        // update local user cache
+        localStorage.setItem('user', JSON.stringify({
+          ...user,
+          id: result.id || user.id,
+          username: result.username || user.username,
+          displayName: result.displayName,
+          avatar: result.avatar,
+          bio: result.bio,
+          location: result.location,
+          website: result.website
+        }));
+        onSave({
+          ...formData,
+          displayName: result.displayName,
+          bio: result.bio,
+          location: result.location,
+          website: result.website,
+          avatar: result.avatar
+        });
+      } else {
+        console.error('❌ Failed to update profile:', response.status);
+        // Still call onSave for local state update
+        onSave(formData);
+      }
     } catch (error) {
-      console.error('Failed to save profile:', error);
+      console.error('❌ Error updating profile:', error);
+      // Still call onSave for local state update
+      onSave(formData);
     } finally {
       setIsLoading(false);
     }

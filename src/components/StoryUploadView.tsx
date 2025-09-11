@@ -60,7 +60,7 @@ interface MusicTrack {
 export function StoryUploadView({ isOpen, onClose, onUpload, preSelectedImage }: StoryUploadViewProps) {
   const [selectedImage, setSelectedImage] = useState(preSelectedImage || '');
   const [caption, setCaption] = useState('');
-  const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState(null);
   const [textOverlay, setTextOverlay] = useState('');
   const [showMusicSelector, setShowMusicSelector] = useState(false);
   const [showTextEditor, setShowTextEditor] = useState(false);

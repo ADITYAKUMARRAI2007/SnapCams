@@ -1,9 +1,23 @@
 // API Service for connecting frontend to backend
-export const SOCKET_BASE_URL = 'http://localhost:5001';
+// Resolve API/Socket base URLs from env or runtime. Default to localhost only in dev.
+const ENV_API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) || null;
+const ENV_SOCKET_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SOCKET_BASE_URL) || null;
+// Optional runtime override via a global injected before app bootstrap
+// eslint-disable-next-line no-undef
+const RUNTIME_API_BASE = (typeof window !== 'undefined' && window.__API_BASE_URL__) || null;
+// eslint-disable-next-line no-undef
+const RUNTIME_SOCKET_BASE = (typeof window !== 'undefined' && window.__SOCKET_BASE_URL__) || null;
+
+const isLocalhost = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.hostname);
+
+const RESOLVED_API_BASE = RUNTIME_API_BASE || ENV_API_BASE || (isLocalhost ? 'http://localhost:5001/api' : `${window.location.origin.replace(/\/$/, '')}/api`);
+const RESOLVED_SOCKET_BASE = RUNTIME_SOCKET_BASE || ENV_SOCKET_BASE || (isLocalhost ? 'http://localhost:5001' : window.location.origin);
+
+export const SOCKET_BASE_URL = RESOLVED_SOCKET_BASE;
 
 class ApiService {
   constructor() {
-    this.baseURL = 'http://localhost:5001/api';
+    this.baseURL = RESOLVED_API_BASE;
     this.accessToken = localStorage.getItem('accessToken') || 'dev-token-aditya-kumar';
     this.refreshToken = localStorage.getItem('refreshToken');
   }

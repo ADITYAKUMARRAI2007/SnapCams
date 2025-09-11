@@ -275,7 +275,7 @@ export function StoriesView({ stories, onClose, currentUser }: StoriesViewProps)
             <div className="flex items-center space-x-6 text-white/80">
               <div className="flex items-center space-x-2">
                 <Heart className="w-5 h-5" />
-                <span>{currentContent.likes.toLocaleString()}</span>
+                <span>{(currentContent.likes ?? 0).toLocaleString()}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <MessageCircle className="w-5 h-5" />

@@ -149,14 +149,14 @@ export function ProfileView({ stats, posts, savedPosts, onCameraClick, onLogout,
                 onClick={onViewFollowers}
                 className="text-center hover:bg-white/5 rounded-lg p-2 transition-colors"
               >
-                <div className="text-white font-semibold">{stats.followers.toLocaleString()}</div>
+                <div className="text-white font-semibold">{(stats.followers ?? 0).toLocaleString()}</div>
                 <div className="text-gray-400 text-sm">followers</div>
               </button>
               <button 
                 onClick={onViewFollowing}
                 className="text-center hover:bg-white/5 rounded-lg p-2 transition-colors"
               >
-                <div className="text-white font-semibold">{stats.following.toLocaleString()}</div>
+                <div className="text-white font-semibold">{(stats.following ?? 0).toLocaleString()}</div>
                 <div className="text-gray-400 text-sm">following</div>
               </button>
             </div>

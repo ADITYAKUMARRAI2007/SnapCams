@@ -231,7 +231,7 @@ function ReelPost({ post, isActive, onLike, onComment, onDuet, onFollow, onSaveP
               } transition-colors`} 
             />
           </button>
-          <span className="text-white text-sm mt-1">{likes.toLocaleString()}</span>
+          <span className="text-white text-sm mt-1">{(likes ?? 0).toLocaleString()}</span>
         </div>
 
         {/* Comment */}
@@ -311,7 +311,7 @@ function ReelPost({ post, isActive, onLike, onComment, onDuet, onFollow, onSaveP
       >
         {/* Likes */}
         <div className="mb-2">
-          <span className="text-white font-semibold">{likes.toLocaleString()} likes</span>
+          <span className="text-white font-semibold">{(likes ?? 0).toLocaleString()} likes</span>
         </div>
         
         {/* Caption */}

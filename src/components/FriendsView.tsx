@@ -287,7 +287,7 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
                                     <span>{friend.location}</span>
                                   </div>
                                 )}
-                                <span>Score: {friend.snapScore.toLocaleString()}</span>
+                                <span>Score: {(friend.snapScore ?? 0).toLocaleString()}</span>
                               </div>
                             </div>
 
@@ -367,7 +367,7 @@ export function FriendsView({ onAddFriend, onMessageFriend }: FriendsViewProps) 
                                     </>
                                   )}
                                 </div>
-                                <p className="text-xs text-white/40">{friend.snapScore.toLocaleString()}</p>
+                                <p className="text-xs text-white/40">{(friend.snapScore ?? 0).toLocaleString()}</p>
                               </div>
                             </div>
                           </div>

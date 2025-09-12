@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -7,7 +8,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 
-// Import routes
+// Import routes (adjust paths if needed)
 const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/users');
 const postRoutes = require('./src/routes/posts');
@@ -25,20 +26,22 @@ const socketHandler = require('./src/socket/socketHandler');
 const app = express();
 const server = createServer(app);
 
-// Allowed origins for CORS (support localhost for dev and multiple deployed client URLs)
+// Build allowed origins list
 const clientEnv = process.env.CLIENT_URL || '';
 const clientEnvList = clientEnv
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
+
 const allowedOrigins = Array.from(new Set([
   'http://localhost:3000',
   'https://snapcams.onrender.com',
+  'https://snapcap-backend.onrender.com',
   'https://snapscam.netlify.app',
   ...clientEnvList
 ]));
 
-// Initialize Socket.IO with matching CORS
+// Init Socket.IO with CORS configured to same allowed origins
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
@@ -47,54 +50,52 @@ const io = new Server(server, {
   }
 });
 
-// Make io accessible to routes
+// Make io available to routes if needed
 app.set('io', io);
 
-// Security middleware
+// Security headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Rate limiting
+// Rate limiter
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs (increased for development)
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.'
   }
 });
-
 app.use(limiter);
 
-// CORS configuration (Express)
+// CORS middleware for all routes — this handles preflight automatically
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // allow server-to-server, curl, mobile
-    return allowedOrigins.includes(origin) ? cb(null, true) : cb(new Error('Not allowed by CORS'));
+    // allow non-browser (no origin) requests
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization','X-Requested-With']
 }));
 
-// Note: The cors middleware above already handles OPTIONS preflight.
-
-// Body parsing middleware
+// Body parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/snapcap')
-.then(() => {
-  console.log('✅ Connected to MongoDB');
-})
-.catch((error) => {
-  console.error('❌ MongoDB connection error:', error);
-  process.exit(1);
-});
+// Connect to MongoDB
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/snapcap';
+mongoose.connect(MONGODB_URI, { autoIndex: false })
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => {
+    console.error('❌ MongoDB connection error:', err);
+    process.exit(1);
+  });
 
-// Health check endpoint
+// Health check
 app.get('/health', (req, res) => {
   res.json({
     success: true,
@@ -116,86 +117,64 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/friends', friendsRoutes);
 
-// Socket.IO connection handling
+// Socket handler (your implementation)
 socketHandler(io);
 
-// 404 handler
+// 404
 app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'API endpoint not found'
-  });
+  res.status(404).json({ success: false, message: 'API endpoint not found' });
 });
 
-// Global error handler
-app.use((error, req, res, next) => {
-  console.error('Global error handler:', error);
-  
-  // Mongoose validation error
-  if (error.name === 'ValidationError') {
-    const errors = Object.values(error.errors).map(err => err.message);
-    return res.status(400).json({
-      success: false,
-      message: 'Validation error',
-      errors
-    });
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err && err.message ? err.message : err);
+  if (!err) return next();
+
+  if (err.name === 'ValidationError') {
+    const errors = Object.values(err.errors || {}).map(e => e.message);
+    return res.status(400).json({ success: false, message: 'Validation error', errors });
   }
-  
-  // Mongoose duplicate key error
-  if (error.code === 11000) {
-    const field = Object.keys(error.keyValue)[0];
-    return res.status(400).json({
-      success: false,
-      message: `${field} already exists`
-    });
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyValue)[0];
+    return res.status(400).json({ success: false, message: `${field} already exists` });
   }
-  
-  // JWT errors
-  if (error.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
   }
-  
-  if (error.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expired'
-    });
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({ success: false, message: 'Token expired' });
   }
-  
-  // Default error
-  res.status(error.status || 500).json({
-    success: false,
-    message: error.message || 'Internal server error'
-  });
+
+  res.status(err.status || 500).json({ success: false, message: err.message || 'Internal server error' });
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('Process terminated');
-    mongoose.connection.close();
-  });
-});
+const shutdown = async (signal) => {
+  try {
+    console.log(`${signal} received. Shutting down gracefully...`);
+    // stop accepting new connections
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+    // close mongoose connection (returns a promise)
+    await mongoose.disconnect();
+    console.log('MongoDB connection closed');
+    process.exit(0);
+  } catch (e) {
+    console.error('Error during shutdown', e);
+    process.exit(1);
+  }
+};
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('Process terminated');
-    mongoose.connection.close();
-  });
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
+// Start
 const PORT = process.env.PORT || 5001;
-
 server.listen(PORT, () => {
   console.log(`🚀 SnapCap API server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API URL: http://localhost:${PORT}`);
-  console.log(`🌐 Allowed Origins: ${allowedOrigins.join(', ')}`);
+  console.log(`🌐 Allowed CORS origins: ${allowedOrigins.join(', ')}`);
 });
 
 module.exports = app;

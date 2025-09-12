@@ -1,12 +1,18 @@
-node_modules
-node_modules
+# build / dist
 dist/
 build/
+
+# env / editor
 .env
-node_modules/
-dist/
-build/
 .vscode/
 .DS_Store
-public/cesium/
 
+# node deps (frontend)
+node_modules/
+
+# ignore backend node_modules and lockfile
+snapcap-backend/node_modules
+snapcap-backend/package-lock.json
+
+# generated assets
+public/cesium/

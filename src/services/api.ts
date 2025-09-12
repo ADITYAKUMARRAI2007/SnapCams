@@ -1,6 +1,24 @@
-// API Configuration
-const API_BASE_URL = 'http://localhost:5001/api';
-const SOCKET_URL = 'http://localhost:5001';
+// API Configuration (env-aware; avoid localhost in production)
+const ENV_API_BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_BASE_URL) || null;
+const ENV_SOCKET_BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_SOCKET_BASE_URL) || null;
+// Optional runtime overrides (can be injected before app bootstrap)
+// @ts-ignore
+const RUNTIME_API_BASE = typeof window !== 'undefined' ? (window as any).__API_BASE_URL__ || null : null;
+// @ts-ignore
+const RUNTIME_SOCKET_BASE = typeof window !== 'undefined' ? (window as any).__SOCKET_BASE_URL__ || null : null;
+
+const isLocalhost = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.hostname);
+
+const API_BASE_URL: string =
+  (RUNTIME_API_BASE as string) ||
+  (ENV_API_BASE as string) ||
+  (isLocalhost ? 'http://localhost:5001/api' : `${window.location.origin.replace(/\/$/, '')}/api`);
+
+const SOCKET_URL: string =
+  (RUNTIME_SOCKET_BASE as string) ||
+  (ENV_SOCKET_BASE as string) ||
+  (isLocalhost ? 'http://localhost:5001' : window.location.origin);
+
 export const SOCKET_BASE_URL = SOCKET_URL;
 
 // API Response Types

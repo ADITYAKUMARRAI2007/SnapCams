@@ -543,7 +543,7 @@ export default function App() {
   const handleLike = async (postId: string) => {
     try {
       // Send like to backend
-      const response = await fetch(`http://localhost:5001/api/posts/${postId}/like`, {
+      const response = await fetch(`http://snapcams.onrender.com/api/posts/${postId}/like`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

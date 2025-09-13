@@ -33,8 +33,8 @@ export function IndividualChatView({ user, onBack, onViewProfile }: IndividualCh
   const [messageText, setMessageText] = useState('');
   const [showAttachments, setShowAttachments] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [messages, setMessages] = useState([]);
-  const messagesEndRef = useRef(null);
+  const [messages, setMessages] = useState([] as Message[]);
+  const messagesEndRef = useRef(null) ;
 
   // Load real messages when component mounts
   useEffect(() => {
@@ -45,7 +45,7 @@ export function IndividualChatView({ user, onBack, onViewProfile }: IndividualCh
       try {
         setIsLoading(true);
         const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5001/api/friends/${(user.id || '').toString()}/messages`, {
+        const response = await fetch(`http://snapcap-backend.onrender.com/api/friends/${(user.id || '').toString()}/messages`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -131,7 +131,7 @@ export function IndividualChatView({ user, onBack, onViewProfile }: IndividualCh
 
     try {
       // Send message to backend using the correct endpoint
-      const response = await fetch(`http://localhost:5001/api/friends/${(user.id || '').toString()}/messages`, {
+      const response = await fetch(`http://snapcap-backend.onrender.com/api/friends/${(user.id || '').toString()}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

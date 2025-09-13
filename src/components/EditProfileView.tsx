@@ -38,7 +38,7 @@ export function EditProfileView({ onBack, onSave, currentProfile }: EditProfileV
     try {
       const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const response = await fetch(`http://localhost:5001/api/users/${user.id}`, {
+      const response = await fetch(`http://snapcap-backend.onrender.com/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

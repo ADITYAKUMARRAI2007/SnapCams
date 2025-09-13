@@ -1,27 +1,65 @@
-// API Configuration (env-aware; avoid localhost in production)
+// src/services/api.ts
+/* Minimal, robust runtime + env resolver and ApiService
+   - Loads runtimeConfig.js (CommonJS) if present
+   - Falls back to window injected values, then import.meta.env, then localhost/origin
+   - Normalizes trailing slashes
+*/
+
+// allow using require in TS/ESM builds (kept minimal)
+declare const require: any;
+
+// Try to load runtimeConfig (CommonJS) in a robust way.
+// runtimeConfig.js exports: exports.API_BASE and exports.SOCKET_BASE
+let runtimeConfig: { API_BASE?: string; SOCKET_BASE?: string } | null = null;
+try {
+  // @ts-ignore - dynamic require for runtime config (works with CommonJS runtimeConfig.js)
+  if (typeof require !== 'undefined') runtimeConfig = require('./runtimeConfig');
+} catch (e) {
+  runtimeConfig = null;
+}
+
+// Environment variables from Vite (if available)
 const ENV_API_BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_BASE_URL) || null;
 const ENV_SOCKET_BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_SOCKET_BASE_URL) || null;
-// Optional runtime overrides (can be injected before app bootstrap)
-// @ts-ignore
-const RUNTIME_API_BASE = typeof window !== 'undefined' ? (window as any).__API_BASE_URL__ || null : null;
-// @ts-ignore
-const RUNTIME_SOCKET_BASE = typeof window !== 'undefined' ? (window as any).__SOCKET_BASE_URL__ || null : null;
 
+// Runtime overrides injected at window (these are secondary; runtimeConfig.js should already prefer window injection)
+const RUNTIME_WINDOW_API = typeof window !== 'undefined' ? (window as any).__API_BASE_URL__ || null : null;
+const RUNTIME_WINDOW_SOCKET = typeof window !== 'undefined' ? (window as any).__SOCKET_BASE_URL__ || null : null;
+
+// Determine localhost vs production
 const isLocalhost = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.hostname);
 
-const API_BASE_URL: string =
-  (RUNTIME_API_BASE as string) ||
-  (ENV_API_BASE as string) ||
-  (isLocalhost ? 'http://localhost:5001/api' : `${window.location.origin.replace(/\/$/, '')}/api`);
+// Resolve API base in priority order:
+// 1. runtimeConfig.API_BASE (from runtimeConfig.js)
+// 2. window injected runtime (window.__API_BASE_URL__)
+// 3. Vite env (import.meta.env.VITE_API_BASE_URL)
+// 4. localhost fallback for dev or origin-based production API
+const RESOLVED_API_BASE = (
+  (runtimeConfig && runtimeConfig.API_BASE) ||
+  RUNTIME_WINDOW_API ||
+  ENV_API_BASE ||
+  (isLocalhost ? 'http://snapcap-backend.onrender.com/api' : (typeof window !== 'undefined' ? `${window.location.origin.replace(/\/$/, '')}/api` : ''))
+);
 
-const SOCKET_URL: string =
-  (RUNTIME_SOCKET_BASE as string) ||
-  (ENV_SOCKET_BASE as string) ||
-  (isLocalhost ? 'http://localhost:5001' : window.location.origin);
+// Resolve socket base similarly
+const RESOLVED_SOCKET_BASE = (
+  (runtimeConfig && runtimeConfig.SOCKET_BASE) ||
+  RUNTIME_WINDOW_SOCKET ||
+  ENV_SOCKET_BASE ||
+  (isLocalhost ? 'http://snapcap-backend.onrender.com' : (typeof window !== 'undefined' ? window.location.origin : ''))
+);
 
-export const SOCKET_BASE_URL = SOCKET_URL;
+// Normalize (remove trailing slash)
+function normalizeBase(url: string) {
+  return url ? url.replace(/\/+$/, '') : '';
+}
 
-// API Response Types
+export const API_BASE_URL = normalizeBase(RESOLVED_API_BASE);
+export const SOCKET_BASE_URL = normalizeBase(RESOLVED_SOCKET_BASE);
+
+// -----------------
+// Types & ApiService (kept same as your file, minimal edits only)
+// -----------------
 interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -545,3 +583,4 @@ export const apiService = new ApiService(API_BASE_URL);
 
 // Export types
 export type { User, Post, Story, AuthResponse, ApiResponse };
+export default apiService;

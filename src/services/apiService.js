@@ -1,7 +1,9 @@
 // API Service for Backend Communication
+import { API_BASE } from './runtimeConfig';
+
 class ApiService {
   constructor() {
-    this.baseURL = 'http://localhost:5001/api';
+    this.baseURL = API_BASE;
     this.timeout = 10000; // 10 seconds
   }
 

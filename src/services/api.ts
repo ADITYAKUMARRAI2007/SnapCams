@@ -193,10 +193,16 @@ class ApiService {
       ...options.headers,
     };
     // Prefer the in-memory accessToken; if missing, check legacy localStorage 'token' as fallback.
-    const tokenToUse = this.accessToken || localStorage.getItem('token');
-    if (tokenToUse) {
+    // Prefer live token from localStorage (canonical 'accessToken' first), with legacy 'token' fallback,
+// then finally in-memory this.accessToken as last resort.
+      const tokenToUse =
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('token') ||
+      this.accessToken;
+
+      if (tokenToUse) {
       headers.Authorization = `Bearer ${tokenToUse}`;
-    }
+      }
 
     try {
       const response = await fetch(url, {

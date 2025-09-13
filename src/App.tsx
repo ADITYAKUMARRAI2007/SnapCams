@@ -21,7 +21,7 @@ import { LiquidEtherBackground } from "./components/LiquidEtherBackground";
 import { ImageUploadFlow } from "./components/ImageUploadFlow";
 import { motion, AnimatePresence } from "motion/react";
 import { MessageCircle, Settings } from "lucide-react";
-
+import { apiService } from './services/api'; 
 interface Pin {
   id: string;
   x: number;
@@ -103,11 +103,48 @@ interface ShareContent {
 }
 
 export default function App() {
-  const [user, setUser] = useState({
-    id: "aditya_kumar",
-    email: "aditya@example.com",
-    username: "aditya_kumar"
-  });
+  const getStoredUser = (): AppUser | null => {
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? (JSON.parse(stored) as AppUser) : null;
+    } catch (e) {
+      return null;
+    }
+  };
+  const [user, setUser] = useState(getStoredUser());
+  
+
+  // optional: try to validate token on mount and populate user if valid
+  useEffect(() => {
+    const tryAutoLogin = async () => {
+      const accessToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      if (!accessToken) return;
+      try {
+        const res = await apiService.getCurrentUser();
+        if (res && res.success && res.data && res.data.user) {
+          setUser(res.data.user as any);
+          // tokens already stored by apiService.login/register; if not, you can store here
+        } else {
+          // invalid token — clear local storage
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      } catch (e) {
+        // network or invalid token — just clear
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        setUser(null);
+      }
+    };
+
+    tryAutoLogin();
+  }, []);
+
   const [currentTab, setCurrentTab] = useState("feed");
   const [showCamera, setShowCamera] = useState(false);
   const [showImageUpload, setShowImageUpload] = useState(false);
@@ -547,7 +584,7 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token') || 'demo-token'}`
+            'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token') || 'demo-token'}`
         }
       });
 

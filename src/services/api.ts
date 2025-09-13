@@ -592,7 +592,66 @@ class ApiService {
 
 // Create and export API service instance
 export const apiService = new ApiService(API_BASE_URL);
+// --- Backwards-compat compatibility: ensure testConnection exists ---
+// This small IIFE ensures ApiService.prototype.testConnection exists and that
+// the exported `apiService` instance also exposes it, preventing runtime
+// "testConnection is not a function" errors in bundles that expect it.
+// --- Backwards-compat compatibility: ensure testConnection exists ---
+// This small IIFE ensures ApiService.prototype.testConnection exists and that
+// the exported `apiService` instance also exposes it, preventing runtime
+// "testConnection is not a function" errors in bundles that expect it.
+;(function ensureTestConnection() {
+  try {
+    // If the class exists and lacks the method, add a fallback implementation
+    if (typeof ApiService !== 'undefined' && (ApiService.prototype as any) && !(ApiService.prototype as any).testConnection) {
+      (ApiService.prototype as any).testConnection = async function() {
+        try {
+          // If this instance has getCurrentUser, prefer that (non-destructive)
+          if (typeof (this as any).getCurrentUser === 'function') {
+            const res = await (this as any).getCurrentUser();
+            // Consider success if we got user data or a success flag
+            return { success: !!(res && (res.success || res.user || res.data)), data: res };
+          }
 
+          // Fallback: try a lightweight ping endpoint (non-fatal)
+          const base = (this as any).baseUrl || (typeof process !== 'undefined' && (process.env.VITE_API_BASE_URL || '')) || '';
+          const pingUrl = (base.replace(/\/$/, '') || '') + '/api/ping';
+          const resp = await fetch(pingUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token') || ''}`
+            }
+          }).catch(() => null);
+
+          if (resp && resp.ok) {
+            let json = {};
+            try { json = await resp.json(); } catch {}
+            return { success: true, data: json };
+          }
+          return { success: false, status: resp ? resp.status : 'no-response' };
+        } catch (err) {
+          return { success: false, error: String(err) };
+        }
+      };
+    }
+
+    // Ensure the exported instance also has the method (in case import shape differs)
+    try {
+      if (typeof apiService !== 'undefined' && !(apiService as any).testConnection) {
+        if (typeof ApiService !== 'undefined' && (ApiService.prototype as any) && (ApiService.prototype as any).testConnection) {
+          (apiService as any).testConnection = (ApiService.prototype as any).testConnection.bind(apiService);
+        } else {
+          // Fallback: attach a noop that returns failure rather than throwing
+          (apiService as any).testConnection = async () => ({ success: false, error: 'no-test-connection-available' });
+        }
+      }
+    } catch (e) {
+      // ignore - this is purely defensive
+    }
+  } catch (e) {
+    // ignore - defensive wrapper
+  }
+})();
 // Export types
 export type { User, Post, Story, AuthResponse, ApiResponse };
 export default apiService;

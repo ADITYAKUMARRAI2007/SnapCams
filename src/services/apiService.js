@@ -313,6 +313,6 @@ class ApiService {
     }
   }
 }
-
 const apiService = new ApiService();
-module.exports = apiService; // CommonJS export (works for both CJS/ESM bundlers)
+module.exports = apiService;   // optional: keeps CommonJS consumers working
+export default apiService;     // <-- add this line so Vite/Rollup ES imports work // CommonJS export (works for both CJS/ESM bundlers)

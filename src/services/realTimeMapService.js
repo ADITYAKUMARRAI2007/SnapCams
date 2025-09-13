@@ -1,5 +1,5 @@
 import websocketService from './websocketService';
-import apiService from './apiService';
+import apiService from './api';
 
 // Real-time Map Service for Live Friend Updates
 class RealTimeMapService {

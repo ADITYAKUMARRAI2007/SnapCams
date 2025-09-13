@@ -1,5 +1,5 @@
 // Chat Service for Frontend Chat Functionality
-import apiService from './apiService';
+import apiService from './api';
 
 class ChatService {
   constructor() {

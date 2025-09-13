@@ -1,4 +1,6 @@
+// src/services/dataSyncService.js
 // Data Synchronization Service - Handles all frontend-backend data sync
+
 import apiService from './api';
 import websocketService from './websocketService';
 
@@ -17,23 +19,74 @@ class DataSyncService {
 
     try {
       console.log('🔄 Initializing data sync service...');
-      
-      // Test backend connection
-      const connectionTest = await apiService.testConnection();
-      if (!connectionTest.success) {
+
+      // --- Defensive connection check: prefer apiService.testConnection but fallback safely ---
+      let connectionTest = null;
+
+      if (apiService && typeof apiService.testConnection === 'function') {
+        // Preferred: call testConnection if it exists
+        connectionTest = await apiService.testConnection();
+      } else if (apiService && typeof apiService.getCurrentUser === 'function') {
+        // Fallback: call getCurrentUser if available (useful for token validation)
+        try {
+          connectionTest = await apiService.getCurrentUser();
+        } catch (e) {
+          connectionTest = null;
+        }
+      } else {
+        // Last fallback: do a simple fetch to /api/auth/me (uses baseUrl if provided)
+        try {
+          const base = (apiService && apiService.baseUrl) || process.env.VITE_API_BASE_URL || '';
+          const url = (base.endsWith('/') ? base.slice(0, -1) : base) + '/api/auth/me';
+          const res = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token') || ''}`,
+              'Content-Type': 'application/json'
+            },
+          });
+          if (res.ok) {
+            // try to parse JSON, may vary by backend
+            try {
+              connectionTest = await res.json();
+            } catch (_) {
+              connectionTest = { success: true };
+            }
+          } else {
+            connectionTest = { success: false, status: res.status };
+          }
+        } catch (err) {
+          connectionTest = { success: false, error: err };
+        }
+      }
+
+      // Validate result (support for different shapes: { success: true } or user payload)
+      const ok =
+        (connectionTest && connectionTest.success === true) ||
+        (connectionTest && connectionTest.data && connectionTest.data.user) ||
+        (connectionTest && connectionTest.id) || // maybe returned a user object directly
+        (connectionTest && connectionTest.username) ||
+        (connectionTest && connectionTest.email);
+
+      if (!ok) {
+        console.warn('⚠️ DataSyncService connection test failed:', connectionTest);
         throw new Error('Backend connection failed');
       }
 
-      // Set up WebSocket connection
-      websocketService.connect();
-      this.setupWebSocketListeners();
+      // Set up WebSocket connection (defensive: only if connect available)
+      if (websocketService && typeof websocketService.connect === 'function') {
+        websocketService.connect();
+        this.setupWebSocketListeners();
+      } else {
+        console.warn('⚠️ websocketService.connect not available, skipping websocket setup');
+      }
 
       // Start periodic sync
       this.startPeriodicSync();
 
       this.isInitialized = true;
       console.log('✅ Data sync service initialized');
-      
+
     } catch (error) {
       console.error('❌ Failed to initialize data sync service:', error);
       throw error;
@@ -71,35 +124,35 @@ class DataSyncService {
   // Handle friend post events
   handleFriendPost(data) {
     const { friendId, post } = data;
-    
+
     // Update cache
     if (this.cache.has('friends')) {
       const friends = this.cache.get('friends');
       const friendIndex = friends.findIndex(f => f.id === friendId);
-      
+
       if (friendIndex !== -1) {
         // Add new post to friend's stories
         if (!friends[friendIndex].stories) {
           friends[friendIndex].stories = [];
         }
-        
+
         // Convert post to story format
         const story = {
           id: post.id,
-          image: post.imageUrl,
+          image: post.imageUrl || post.image || post.photoUrl,
           caption: post.caption,
-          timestamp: new Date(post.createdAt).getTime(),
+          timestamp: new Date(post.createdAt || post.timestamp || Date.now()).getTime(),
           likes: post.likes || 0,
           comments: post.comments || 0
         };
-        
+
         friends[friendIndex].stories.unshift(story);
-        
+
         // Keep only last 10 stories
         if (friends[friendIndex].stories.length > 10) {
           friends[friendIndex].stories = friends[friendIndex].stories.slice(0, 10);
         }
-        
+
         this.cache.set('friends', friends);
         this.notifyListeners('friends_updated', friends);
       }
@@ -109,11 +162,11 @@ class DataSyncService {
   // Handle location updates
   handleLocationUpdate(data) {
     const { friendId, location } = data;
-    
+
     if (this.cache.has('friends')) {
       const friends = this.cache.get('friends');
       const friendIndex = friends.findIndex(f => f.id === friendId);
-      
+
       if (friendIndex !== -1) {
         friends[friendIndex].location = location;
         this.cache.set('friends', friends);
@@ -125,10 +178,10 @@ class DataSyncService {
   // Handle new friend addition
   handleNewFriend(data) {
     const { friend } = data;
-    
+
     if (this.cache.has('friends')) {
       const friends = this.cache.get('friends');
-      
+
       // Check if friend already exists
       const existingIndex = friends.findIndex(f => f.id === friend.id);
       if (existingIndex === -1) {
@@ -143,7 +196,7 @@ class DataSyncService {
   // Handle friend removal
   handleFriendRemoved(data) {
     const { friendId } = data;
-    
+
     if (this.cache.has('friends')) {
       const friends = this.cache.get('friends');
       const filteredFriends = friends.filter(f => f.id !== friendId);
@@ -155,11 +208,11 @@ class DataSyncService {
   // Handle online status changes
   handleOnlineStatusChange(data) {
     const { friendId, isOnline, lastSeen } = data;
-    
+
     if (this.cache.has('friends')) {
       const friends = this.cache.get('friends');
       const friendIndex = friends.findIndex(f => f.id === friendId);
-      
+
       if (friendIndex !== -1) {
         friends[friendIndex].isOnline = isOnline;
         friends[friendIndex].lastSeen = lastSeen;
@@ -196,15 +249,22 @@ class DataSyncService {
   async syncAllData() {
     try {
       console.log('🔄 Syncing all data...');
-      
+
       // Sync friends data
-      const friends = await apiService.getFriends();
+      let friends = [];
+      if (apiService && typeof apiService.getFriends === 'function') {
+        friends = await apiService.getFriends();
+      } else {
+        // if apiService.getFriends not present, don't throw — just set empty
+        friends = [];
+      }
+
       this.cache.set('friends', friends);
       this.notifyListeners('friends_updated', friends);
-      
+
       this.lastSyncTime = Date.now();
       console.log('✅ Data sync completed');
-      
+
     } catch (error) {
       console.error('❌ Data sync failed:', error);
       throw error;
@@ -225,7 +285,7 @@ class DataSyncService {
   // Add event listener
   addListener(callback) {
     this.listeners.add(callback);
-    
+
     // Return unsubscribe function
     return () => {
       this.listeners.delete(callback);
@@ -250,14 +310,16 @@ class DataSyncService {
       lastSyncTime: this.lastSyncTime,
       cacheSize: this.cache.size,
       listenersCount: this.listeners.size,
-      websocketStatus: websocketService.getStatus()
+      websocketStatus: websocketService.getStatus ? websocketService.getStatus() : null
     };
   }
 
   // Cleanup
   destroy() {
     this.stopPeriodicSync();
-    websocketService.disconnect();
+    if (websocketService && typeof websocketService.disconnect === 'function') {
+      websocketService.disconnect();
+    }
     this.listeners.clear();
     this.cache.clear();
     this.isInitialized = false;
@@ -268,6 +330,3 @@ class DataSyncService {
 const dataSyncService = new DataSyncService();
 
 export default dataSyncService;
-
-
-

@@ -1,5 +1,5 @@
 // Data Synchronization Service - Handles all frontend-backend data sync
-import apiService from './apiService';
+import apiService from './api';
 import websocketService from './websocketService';
 
 class DataSyncService {

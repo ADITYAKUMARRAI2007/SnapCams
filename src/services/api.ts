@@ -159,21 +159,26 @@ class ApiService {
 
   // Token Management
   private loadTokens(): void {
-    this.accessToken = localStorage.getItem('accessToken');
+    // Prefer canonical accessToken, but fall back to legacy "token" key if present
+    this.accessToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
     this.refreshToken = localStorage.getItem('refreshToken');
   }
 
   private saveTokens(accessToken: string, refreshToken: string): void {
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
+    // Store both canonical and legacy keys so all code paths work
     localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('token', accessToken); // legacy fallback used across repo
     localStorage.setItem('refreshToken', refreshToken);
   }
 
   private clearTokens(): void {
     this.accessToken = null;
     this.refreshToken = null;
+    // Remove both canonical and legacy keys
     localStorage.removeItem('accessToken');
+    localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
   }
 
@@ -187,9 +192,10 @@ class ApiService {
       'Content-Type': 'application/json',
       ...options.headers,
     };
-
-    if (this.accessToken) {
-      headers.Authorization = `Bearer ${this.accessToken}`;
+    // Prefer the in-memory accessToken; if missing, check legacy localStorage 'token' as fallback.
+    const tokenToUse = this.accessToken || localStorage.getItem('token');
+    if (tokenToUse) {
+      headers.Authorization = `Bearer ${tokenToUse}`;
     }
 
     try {

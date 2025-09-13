@@ -10,7 +10,7 @@ class SocketService {
   }
 
   private loadToken() {
-    this.accessToken = localStorage.getItem('accessToken');
+    this.accessToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
   }
 
   // Connect to Socket.IO server
@@ -30,10 +30,8 @@ class SocketService {
       }
 
       this.socket = io(SOCKET_BASE_URL, {
-        auth: {
-          token: this.accessToken,
-        },
-        transports: ['websocket', 'polling'],
+        auth: { token: this.accessToken },
+        transports: ['websocket']
       });
 
       this.socket.on('connect', () => {

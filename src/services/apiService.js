@@ -20,7 +20,7 @@ class ApiService {
     };
 
     // Add auth token if available
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -155,8 +155,8 @@ class ApiService {
         body: JSON.stringify({ email, password })
       });
       
-      if (response.token) {
-        localStorage.setItem('token', response.token);
+      if (response.accessToken) {
+        localStorage.setItem('accessToken', response.accessToken);
         localStorage.setItem('refreshToken', response.refreshToken);
         localStorage.setItem('user', JSON.stringify(response.user));
       }
@@ -175,8 +175,8 @@ class ApiService {
         body: JSON.stringify(userData)
       });
       
-      if (response.token) {
-        localStorage.setItem('token', response.token);
+      if (response.accessToken) {
+        localStorage.setItem('accessToken', response.accessToken);
         localStorage.setItem('refreshToken', response.refreshToken);
         localStorage.setItem('user', JSON.stringify(response.user));
       }
@@ -214,11 +214,10 @@ class ApiService {
         body: JSON.stringify({ refreshToken })
       });
       
-      if (response.token) {
-        localStorage.setItem('token', response.token);
+      if (response.accessToken) {
+        localStorage.setItem('accessToken', response.accessToken);
         localStorage.setItem('refreshToken', response.refreshToken);
       }
-      
       return response;
     } catch (error) {
       console.error('Token refresh failed:', error);
@@ -228,7 +227,7 @@ class ApiService {
   }
 
   isAuthenticated() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     if (!token) return false;
     
     try {

@@ -36,6 +36,7 @@ export function EditProfileView({ onBack, onSave, currentProfile }: EditProfileV
   const handleSave = async () => {
     setIsLoading(true);
     try {
+    
       const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await fetch(`http://snapcap-backend.onrender.com/api/users/${user.id}`, {

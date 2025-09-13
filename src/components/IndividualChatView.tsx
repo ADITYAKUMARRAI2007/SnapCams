@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { socketService } from '../services/socket';
-
+import { API_BASE_URL } from '../services/api'; 
 interface User {
   id: string;
   username: string;
@@ -45,9 +45,10 @@ export function IndividualChatView({ user, onBack, onViewProfile }: IndividualCh
       try {
         setIsLoading(true);
         const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-        const response = await fetch(`http://snapcap-backend.onrender.com/api/friends/${(user.id || '').toString()}/messages`, {
+        const url = `${API_BASE_URL}/friends/${(user.id || '').toString()}/messages`;
+        const response = await fetch(url, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         });
         
@@ -130,18 +131,20 @@ export function IndividualChatView({ user, onBack, onViewProfile }: IndividualCh
     setMessages(prev => [...prev, optimisticMessage]);
 
     try {
-      // Send message to backend using the correct endpoint
-      const response = await fetch(`http://snapcap-backend.onrender.com/api/friends/${(user.id || '').toString()}/messages`, {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const url = `${API_BASE_URL}/friends/${(user.id || '').toString()}/messages`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+          'Authorization': token ? `Bearer ${token}` : ''
         },
         body: JSON.stringify({
           content: messageContent,
           type: 'text'
         })
       });
+
 
       if (response.ok) {
         const result = await response.json();

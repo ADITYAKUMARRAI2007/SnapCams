@@ -15,8 +15,14 @@
       <meta name="referrer" content="strict-origin-when-cross-origin" />
       
       <!-- Security Headers for Camera Access -->
-      <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: https://maps.googleapis.com https://*.googleapis.com; media-src 'self' blob: data:; connect-src 'self' https: ws: wss: http://localhost:5001 http://localhost:3000 http://localhost:3001 http://localhost:3002 https://api.mapbox.com https://*.mapbox.com https://events.mapbox.com https://tile.openstreetmap.org https://cartodb-basemaps-a.global.ssl.fastly.net https://maps.googleapis.com https://*.googleapis.com; worker-src 'self' blob:;" />
-      
+      <meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.googleapis.com;
+               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               img-src 'self' data: blob: https: https://maps.googleapis.com https://*.googleapis.com;
+               media-src 'self' blob: data:;
+               connect-src 'self' https: ws: wss: http://localhost:5001 http://localhost:3000 http://localhost:3001 http://localhost:3002 https://snapcap-backend.onrender.com https://snapcams.onrender.com https://api.mapbox.com https://*.mapbox.com https://events.mapbox.com https://tile.openstreetmap.org https://cartodb-basemaps-a.global.ssl.fastly.net https://maps.googleapis.com https://*.googleapis.com;
+               worker-src 'self' blob:;">
       <title>AI Social Inspiration App</title>
     </head>
 

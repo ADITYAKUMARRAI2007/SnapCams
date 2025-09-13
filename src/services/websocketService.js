@@ -1,4 +1,6 @@
-// WebSocket Service for Real-time Map Updates
+// src/services/websocketService.js
+// Minimal changes to prefer VITE_SOCKET_BASE_URL and normalize to ws(s) scheme.
+
 class WebSocketService {
   constructor() {
     this.socket = null;
@@ -9,14 +11,81 @@ class WebSocketService {
     this.reconnectDelay = 1000;
   }
 
+  // determine best configured socket URL
+  getConfiguredUrl() {
+    // Vite: import.meta.env (set at build time)
+    let cfg = null;
+    try {
+      if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SOCKET_BASE_URL) {
+        cfg = import.meta.env.VITE_SOCKET_BASE_URL;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    // fallback to old react env name if present
+    if (!cfg && typeof process !== 'undefined' && process.env && process.env.REACT_APP_WS_URL) {
+      cfg = process.env.REACT_APP_WS_URL;
+    }
+
+    return cfg;
+  }
+
+  // normalize http(s) -> ws(s) and return final url or null
+  normalizeToWs(url) {
+    if (!url) return null;
+    // already ws/wss
+    if (url.startsWith('ws://') || url.startsWith('wss://')) return url;
+    // http(s) -> ws(s)
+    if (url.startsWith('http://')) return url.replace(/^http:\/\//, 'ws://');
+    if (url.startsWith('https://')) return url.replace(/^https:\/\//, 'wss://');
+    // raw host/path: prefer wss on https pages
+    if (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:') {
+      return `wss://${url}`;
+    }
+    return `ws://${url}`;
+  }
+
+  // only fallback to localhost when page is running on localhost
+  getSocketUrlOrNull() {
+    const configured = this.getConfiguredUrl();
+    if (configured) {
+      return this.normalizeToWs(configured);
+    }
+
+    // development fallback: only attempt localhost if page is local
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (host === 'localhost' || host === '127.0.0.1') {
+        return window.location.protocol === 'https:' ? 'wss://localhost:5001' : 'ws://localhost:5001';
+      }
+    }
+
+    // production with no configured socket: don't connect
+    return null;
+  }
+
   // Connect to WebSocket server
   connect() {
     try {
-      const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:5001';
+      const wsUrl = this.getSocketUrlOrNull();
+
+      if (!wsUrl) {
+        console.warn('[websocketService] No socket URL configured; skipping WebSocket connection.');
+        return;
+      }
+
+      // Avoid reconnecting if already open
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        console.log('[websocketService] Already connected to', this.socket.url);
+        return;
+      }
+
+      console.log('[websocketService] Attempting WebSocket connect to:', wsUrl);
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
-        console.log('🔌 WebSocket connected');
+        console.log('🔌 WebSocket connected to', wsUrl);
         this.isConnected = true;
         this.reconnectAttempts = 0;
         this.emit('connected');
@@ -27,14 +96,16 @@ class WebSocketService {
           const data = JSON.parse(event.data);
           this.handleMessage(data);
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          // If message isn't JSON, emit raw
+          this.emit('__raw__', event.data);
+          console.error('Error parsing WebSocket message (falling back to raw):', error);
         }
       };
 
-      this.socket.onclose = () => {
-        console.log('🔌 WebSocket disconnected');
+      this.socket.onclose = (ev) => {
+        console.log('🔌 WebSocket disconnected', ev);
         this.isConnected = false;
-        this.emit('disconnected');
+        this.emit('disconnected', ev);
         this.attemptReconnect();
       };
 
@@ -45,13 +116,13 @@ class WebSocketService {
 
     } catch (error) {
       console.error('Error connecting to WebSocket:', error);
+      this.attemptReconnect();
     }
   }
 
-  // Handle incoming messages
+  // Handle incoming messages (keeps your original message types)
   handleMessage(data) {
-    const { type, payload } = data;
-    
+    const { type, payload } = data || {};
     switch (type) {
       case 'friend_posted':
         this.emit('friend_posted', payload);
@@ -69,13 +140,15 @@ class WebSocketService {
         this.emit('friend_online_status', payload);
         break;
       default:
+        // unknown message type - forward as generic
+        this.emit('__message__', data);
         console.log('Unknown WebSocket message type:', type);
     }
   }
 
   // Send message to server
   send(type, payload) {
-    if (this.isConnected && this.socket) {
+    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
       const message = {
         type,
         payload,
@@ -124,7 +197,6 @@ class WebSocketService {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-      
       setTimeout(() => {
         this.connect();
       }, this.reconnectDelay * this.reconnectAttempts);
@@ -136,7 +208,7 @@ class WebSocketService {
   // Disconnect
   disconnect() {
     if (this.socket) {
-      this.socket.close();
+      try { this.socket.close(); } catch (e) {}
       this.socket = null;
     }
     this.isConnected = false;
@@ -148,7 +220,8 @@ class WebSocketService {
     return {
       isConnected: this.isConnected,
       reconnectAttempts: this.reconnectAttempts,
-      listenersCount: this.listeners.size
+      listenersCount: this.listeners.size,
+      url: this.socket ? this.socket.url : this.getConfiguredUrl()
     };
   }
 }

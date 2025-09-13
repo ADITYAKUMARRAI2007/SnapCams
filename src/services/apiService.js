@@ -313,6 +313,8 @@ class ApiService {
     }
   }
 }
+// Create singleton instance
 const apiService = new ApiService();
-module.exports = apiService;   // optional: keeps CommonJS consumers working
-export default apiService;     // <-- add this line so Vite/Rollup ES imports work // CommonJS export (works for both CJS/ESM bundlers)
+
+// Use ESM default export (this is what Vite/Rollup and your frontend code expect)
+export default apiService;    // <-- add this line so Vite/Rollup ES imports work // CommonJS export (works for both CJS/ESM bundlers)

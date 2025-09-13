@@ -10,26 +10,99 @@ class WebSocketService {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 1000;
   }
-
   // determine best configured socket URL
-  getConfiguredUrl() {
-    // Vite: import.meta.env (set at build time)
-    let cfg = null;
-    try {
-      if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SOCKET_BASE_URL) {
-        cfg = import.meta.env.VITE_SOCKET_BASE_URL;
-      }
-    } catch (e) {
-      /* ignore */
-    }
+  // inside class WebSocketService { ... }
 
-    // fallback to old react env name if present
-    if (!cfg && typeof process !== 'undefined' && process.env && process.env.REACT_APP_WS_URL) {
-      cfg = process.env.REACT_APP_WS_URL;
+getConfiguredUrl() {
+  // prefer Vite style first
+  let base = null;
+  try {
+    if ( typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SOCKET_BASE_URL) {
+      base = import.meta.env.VITE_SOCKET_BASE_URL;
     }
+  } catch (e) { /* ignore */ }
 
-    return cfg;
+  // fallback to old react env name
+  if (!base && typeof process !== 'undefined' && process.env && process.env.REACT_APP_WS_URL) {
+    base = process.env.REACT_APP_WS_URL;
   }
+
+  // if still none, return null so caller uses the default
+  if (!base) return null;
+
+  // normalize protocol:
+  // if user put https://api.example.com -> we want wss://api.example.com
+  // if they put http:// -> ws://
+  if (base.startsWith('https://')) {
+    base = base.replace(/^https:\/\//i, 'wss://');
+  } else if (base.startsWith('http://')) {
+    base = base.replace(/^http:\/\//i, 'ws://');
+  }
+
+  // ensure some path — many servers expose ws on /ws or /socket
+  // if user provided a host-only like wss://host.com or https://host.com,
+  // append /ws so we don't try root which many servers don't accept.
+  try {
+    const u = new URL(base);
+    if (!u.pathname || u.pathname === '/') {
+      u.pathname = '/ws';
+    }
+    return u.toString();
+  } catch (err) {
+    // if it's not a full URL, attempt simple heuristics
+    if (!base.includes('/')) return base + '/ws';
+    return base;
+  }
+}
+
+connect() {
+  try {
+    // build the URL
+    const wsUrl = this.getConfiguredUrl() || 'ws://localhost:5001/ws';
+
+    // optional token in query if backend expects JWT
+    const token = (typeof window !== 'undefined' && localStorage.getItem('accessToken')) || null;
+    const urlWithToken = token ? `${wsUrl}?token=${encodeURIComponent(token)}` : wsUrl;
+
+    console.log(`[websocketService] Attempting WebSocket connect to: ${urlWithToken}`);
+    this.socket = new WebSocket(urlWithToken);
+
+    this.socket.onopen = () => {
+      console.log('🔌 WebSocket connected');
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+      this.emit('connected');
+    };
+
+    this.socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        this.handleMessage(data);
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    this.socket.onclose = (ev) => {
+      console.log('🔌 WebSocket disconnected', ev);
+      this.isConnected = false;
+      this.emit('disconnected', ev);
+      if (!ev.wasClean) {
+        // show the close code for debugging
+        console.warn('[websocketService] close code:', ev.code, 'reason:', ev.reason);
+      }
+      this.attemptReconnect();
+    };
+
+    this.socket.onerror = (error) => {
+      console.error('WebSocket error: ', error);
+      this.emit('error', error);
+    };
+
+  } catch (error) {
+    console.error('Error connecting to WebSocket:', error);
+  }
+}
 
   // normalize http(s) -> ws(s) and return final url or null
   normalizeToWs(url) {

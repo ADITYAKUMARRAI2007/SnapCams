@@ -1,6 +1,6 @@
 // src/services/websocketService.js
 import { io } from "socket.io-client";
-
+window.io = io;
 class WebSocketService {
   constructor() {
     this.socket = null;

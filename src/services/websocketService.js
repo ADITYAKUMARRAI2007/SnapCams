@@ -23,49 +23,41 @@ class WebSocketService {
       base = process.env.REACT_APP_WS_URL;
     }
 
-    if (!base) return null;
-
-    // keep as-is for fallback; we'll convert for socket.io client
-    return base;
+    return base || null;
   }
 
-  // convert ws/wss to http(s) for socket.io client, otherwise return as http(s)
+  // Normalize to http(s) because socket.io client expects http(s)/https more reliably
   _toHttpUrl(url) {
     if (!url) return null;
     if (url.startsWith("wss://")) return url.replace(/^wss:\/\//i, "https://");
     if (url.startsWith("ws://")) return url.replace(/^ws:\/\//i, "http://");
-    // if it already starts with http/https, return as-is
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    // otherwise assume https
+    // assume https if bare host
     return `https://${url}`;
   }
 
   connect() {
     try {
-      // === Use Socket.IO client (minimal change) ===
-      // Pick configured base; prefer VITE_SOCKET_BASE_URL (http(s) or ws(s))
       const configured = this.getConfiguredUrl();
-      // Default to current origin if not configured
-      const base = configured || (typeof window !== "undefined" ? window.location.origin : "http://localhost:5000");
+      const base = configured || (typeof window !== "undefined" ? window.location.origin : "https://localhost");
       const socketUrl = this._toHttpUrl(base);
 
-      // If a token exists, pass it via auth (socket.io recommended way)
+      // token passed via auth (socket.io recommended)
       const token = (typeof window !== "undefined" && localStorage.getItem("accessToken")) || null;
       const auth = token ? { token } : undefined;
 
-      // Avoid reconnecting if already open
       if (this.socket && this.socket.connected) {
-        console.log("[websocketService] Already connected to", this.socket.io?.uri || this.socket?.id || socketUrl);
+        console.log("[websocketService] Already connected to", this.socket.id || this.socket.io?.uri || socketUrl);
         return;
       }
 
       console.log("[websocketService] Attempting Socket.IO connect to:", socketUrl);
 
-      // minimal options: force websocket transport to avoid polling if server supports it
+      // NOTE: removed transports:["websocket"] so polling fallback works.
       this.socket = io(socketUrl, {
-        path: "/socket.io", // default; change if your server uses another path
-        transports: ["websocket"],
+        path: "/socket.io",
         auth,
+        withCredentials: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
       });
@@ -78,7 +70,7 @@ class WebSocketService {
       });
 
       this.socket.on("connect_error", (err) => {
-        console.error("❌ Socket.IO connection error:", err && err.message ? err.message : err);
+        console.error("❌ Socket.IO connect_error:", err && err.message ? err.message : err);
         this.emit("error", err);
       });
 
@@ -86,35 +78,29 @@ class WebSocketService {
         console.log("🔌 Socket.IO disconnected:", reason);
         this.isConnected = false;
         this.emit("disconnected", reason);
-        // socket.io does built-in reconnects; we still keep attemptReconnect count for telemetry
-        this.reconnectAttempts++;
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          console.error("❌ Max reconnection attempts reached (socket.io)");
-        }
       });
 
-      // forward server events you expect
+      // forward server events
       this.socket.on("friend_posted", (payload) => this.emit("friend_posted", payload));
       this.socket.on("friend_location_updated", (payload) => this.emit("friend_location_updated", payload));
       this.socket.on("new_friend_added", (payload) => this.emit("new_friend_added", payload));
       this.socket.on("friend_removed", (payload) => this.emit("friend_removed", payload));
       this.socket.on("friend_online_status", (payload) => this.emit("friend_online_status", payload));
 
-      // also forward any event to local listeners
+      // optional: forward unknown events
       if (typeof this.socket.onAny === "function") {
         this.socket.onAny((event, payload) => {
-          // already forwarded known events above; this will also let you listen for any other event
+          // local listeners can subscribe to event names
           this.emit(event, payload);
         });
       }
     } catch (error) {
       console.error("Error connecting (socket.io):", error);
-      // no manual attemptReconnect needed — socket.io will try; but keep for diagnostics
+      // socket.io client will perform reconnects automatically (based on options)
       this.reconnectAttempts++;
     }
   }
 
-  // send/emit to server (use socket.io emit when using socket.io)
   send(type, payload) {
     if (this.socket && this.socket.connected) {
       try {
@@ -127,7 +113,6 @@ class WebSocketService {
     }
   }
 
-  // Keep your existing on/off/emit listener API (local listeners)
   on(event, callback) {
     if (!this.listeners.has(event)) this.listeners.set(event, []);
     this.listeners.get(event).push(callback);
@@ -153,17 +138,14 @@ class WebSocketService {
     }
   }
 
-  // keep attemptReconnect for parity (socket.io auto reconnects by default)
   attemptReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`🔄 Attempting reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-      // With socket.io, we can ask it to reconnect
       try {
         if (this.socket && typeof this.socket.connect === "function") {
           this.socket.connect();
         } else {
-          // if no socket instance, call connect() which will create one
           this.connect();
         }
       } catch (e) {
@@ -177,11 +159,8 @@ class WebSocketService {
   disconnect() {
     if (this.socket) {
       try {
-        if (typeof this.socket.disconnect === "function") {
-          this.socket.disconnect();
-        } else if (typeof this.socket.close === "function") {
-          this.socket.close();
-        }
+        if (typeof this.socket.disconnect === "function") this.socket.disconnect();
+        else if (typeof this.socket.close === "function") this.socket.close();
       } catch (e) {}
       this.socket = null;
     }
@@ -194,7 +173,7 @@ class WebSocketService {
       isConnected: this.isConnected,
       reconnectAttempts: this.reconnectAttempts,
       listenersCount: this.listeners.size,
-      url: this.socket && this.socket.io ? this.socket.io.uri : this.getConfiguredUrl(),
+      url: this.socket && this.socket.io ? (this.socket.io?.uri || this.getConfiguredUrl()) : this.getConfiguredUrl(),
       socketId: this.socket ? this.socket.id : null,
     };
   }

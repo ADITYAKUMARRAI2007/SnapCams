@@ -1,4 +1,6 @@
 // src/services/websocketService.js
+import { io } from "socket.io-client";
+
 class WebSocketService {
   constructor() {
     this.socket = null;
@@ -15,8 +17,7 @@ class WebSocketService {
       if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_SOCKET_BASE_URL) {
         base = import.meta.env.VITE_SOCKET_BASE_URL;
       }
-    } catch (e) {
-    }
+    } catch (e) {}
 
     if (!base && typeof process !== "undefined" && process.env && process.env.REACT_APP_WS_URL) {
       base = process.env.REACT_APP_WS_URL;
@@ -24,92 +25,109 @@ class WebSocketService {
 
     if (!base) return null;
 
-    // normalize protocol
-    if (base.startsWith("https://")) {
-      base = base.replace(/^https:\/\//i, "wss://");
-    } else if (base.startsWith("http://")) {
-      base = base.replace(/^http:\/\//i, "ws://");
-    }
+    // keep as-is for fallback; we'll convert for socket.io client
+    return base;
+  }
 
-    return base; // ✅ don't force-append "/ws" here
+  // convert ws/wss to http(s) for socket.io client, otherwise return as http(s)
+  _toHttpUrl(url) {
+    if (!url) return null;
+    if (url.startsWith("wss://")) return url.replace(/^wss:\/\//i, "https://");
+    if (url.startsWith("ws://")) return url.replace(/^ws:\/\//i, "http://");
+    // if it already starts with http/https, return as-is
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    // otherwise assume https
+    return `https://${url}`;
   }
 
   connect() {
     try {
-      const wsUrl = this.getConfiguredUrl() || "ws://localhost:5001";
+      // === Use Socket.IO client (minimal change) ===
+      // Pick configured base; prefer VITE_SOCKET_BASE_URL (http(s) or ws(s))
+      const configured = this.getConfiguredUrl();
+      // Default to current origin if not configured
+      const base = configured || (typeof window !== "undefined" ? window.location.origin : "http://localhost:5000");
+      const socketUrl = this._toHttpUrl(base);
+
+      // If a token exists, pass it via auth (socket.io recommended way)
       const token = (typeof window !== "undefined" && localStorage.getItem("accessToken")) || null;
-      const urlWithToken = token ? `${wsUrl}?token=${encodeURIComponent(token)}` : wsUrl;
+      const auth = token ? { token } : undefined;
 
-      console.log(`[websocketService] Attempting WebSocket connect to: ${urlWithToken}`);
-      this.socket = new WebSocket(urlWithToken);
+      // Avoid reconnecting if already open
+      if (this.socket && this.socket.connected) {
+        console.log("[websocketService] Already connected to", this.socket.io?.uri || this.socket?.id || socketUrl);
+        return;
+      }
 
-      this.socket.onopen = () => {
-        console.log("🔌 WebSocket connected");
+      console.log("[websocketService] Attempting Socket.IO connect to:", socketUrl);
+
+      // minimal options: force websocket transport to avoid polling if server supports it
+      this.socket = io(socketUrl, {
+        path: "/socket.io", // default; change if your server uses another path
+        transports: ["websocket"],
+        auth,
+        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionDelay: this.reconnectDelay,
+      });
+
+      this.socket.on("connect", () => {
+        console.log("🔌 Socket.IO connected", this.socket.id);
         this.isConnected = true;
         this.reconnectAttempts = 0;
-        this.emit("connected");
-      };
+        this.emit("connected", { id: this.socket.id });
+      });
 
-      this.socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.handleMessage(data);
-        } catch (error) {
-          this.emit("__raw__", event.data);
-          console.error("Error parsing WebSocket message:", error);
-        }
-      };
+      this.socket.on("connect_error", (err) => {
+        console.error("❌ Socket.IO connection error:", err && err.message ? err.message : err);
+        this.emit("error", err);
+      });
 
-      this.socket.onclose = (ev) => {
-        console.log("🔌 WebSocket disconnected", ev);
+      this.socket.on("disconnect", (reason) => {
+        console.log("🔌 Socket.IO disconnected:", reason);
         this.isConnected = false;
-        this.emit("disconnected", ev);
-        this.attemptReconnect();
-      };
+        this.emit("disconnected", reason);
+        // socket.io does built-in reconnects; we still keep attemptReconnect count for telemetry
+        this.reconnectAttempts++;
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          console.error("❌ Max reconnection attempts reached (socket.io)");
+        }
+      });
 
-      this.socket.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        this.emit("error", error);
-      };
+      // forward server events you expect
+      this.socket.on("friend_posted", (payload) => this.emit("friend_posted", payload));
+      this.socket.on("friend_location_updated", (payload) => this.emit("friend_location_updated", payload));
+      this.socket.on("new_friend_added", (payload) => this.emit("new_friend_added", payload));
+      this.socket.on("friend_removed", (payload) => this.emit("friend_removed", payload));
+      this.socket.on("friend_online_status", (payload) => this.emit("friend_online_status", payload));
+
+      // also forward any event to local listeners
+      if (typeof this.socket.onAny === "function") {
+        this.socket.onAny((event, payload) => {
+          // already forwarded known events above; this will also let you listen for any other event
+          this.emit(event, payload);
+        });
+      }
     } catch (error) {
-      console.error("Error connecting to WebSocket:", error);
-      this.attemptReconnect();
+      console.error("Error connecting (socket.io):", error);
+      // no manual attemptReconnect needed — socket.io will try; but keep for diagnostics
+      this.reconnectAttempts++;
     }
   }
 
-  handleMessage(data) {
-    const { type, payload } = data || {};
-    switch (type) {
-      case "friend_posted":
-        this.emit("friend_posted", payload);
-        break;
-      case "friend_location_updated":
-        this.emit("friend_location_updated", payload);
-        break;
-      case "new_friend_added":
-        this.emit("new_friend_added", payload);
-        break;
-      case "friend_removed":
-        this.emit("friend_removed", payload);
-        break;
-      case "friend_online_status":
-        this.emit("friend_online_status", payload);
-        break;
-      default:
-        this.emit("__message__", data);
-        console.log("Unknown WebSocket message type:", type);
-    }
-  }
-
+  // send/emit to server (use socket.io emit when using socket.io)
   send(type, payload) {
-    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      const message = { type, payload, timestamp: Date.now() };
-      this.socket.send(JSON.stringify(message));
+    if (this.socket && this.socket.connected) {
+      try {
+        this.socket.emit(type, payload);
+      } catch (e) {
+        console.error("Error emitting via socket.io:", e);
+      }
     } else {
-      console.warn("WebSocket not connected, cannot send message");
+      console.warn("Socket not connected, cannot send message:", type);
     }
   }
 
+  // Keep your existing on/off/emit listener API (local listeners)
   on(event, callback) {
     if (!this.listeners.has(event)) this.listeners.set(event, []);
     this.listeners.get(event).push(callback);
@@ -135,11 +153,22 @@ class WebSocketService {
     }
   }
 
+  // keep attemptReconnect for parity (socket.io auto reconnects by default)
   attemptReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-      setTimeout(() => this.connect(), this.reconnectDelay * this.reconnectAttempts);
+      console.log(`🔄 Attempting reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+      // With socket.io, we can ask it to reconnect
+      try {
+        if (this.socket && typeof this.socket.connect === "function") {
+          this.socket.connect();
+        } else {
+          // if no socket instance, call connect() which will create one
+          this.connect();
+        }
+      } catch (e) {
+        console.error("Error during attemptReconnect:", e);
+      }
     } else {
       console.error("❌ Max reconnection attempts reached");
     }
@@ -148,8 +177,12 @@ class WebSocketService {
   disconnect() {
     if (this.socket) {
       try {
-        this.socket.close();
-      } catch {}
+        if (typeof this.socket.disconnect === "function") {
+          this.socket.disconnect();
+        } else if (typeof this.socket.close === "function") {
+          this.socket.close();
+        }
+      } catch (e) {}
       this.socket = null;
     }
     this.isConnected = false;
@@ -161,7 +194,8 @@ class WebSocketService {
       isConnected: this.isConnected,
       reconnectAttempts: this.reconnectAttempts,
       listenersCount: this.listeners.size,
-      url: this.socket ? this.socket.url : this.getConfiguredUrl(),
+      url: this.socket && this.socket.io ? this.socket.io.uri : this.getConfiguredUrl(),
+      socketId: this.socket ? this.socket.id : null,
     };
   }
 }

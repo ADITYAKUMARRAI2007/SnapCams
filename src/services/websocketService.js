@@ -1,6 +1,14 @@
 // src/services/websocketService.js
+// Minimal, fixed Socket.IO client wrapper for SnapCap
+// - single io(...) call (no duplicates)
+// - sends token in both auth and query (compatibility)
+// - allows polling fallback (no forced transports)
+// - helpful debug logs
+
 import { io } from "socket.io-client";
-window.io = io;
+// optional: expose io for quick debugging in browser console
+if (typeof window !== "undefined") window.io = io;
+
 class WebSocketService {
   constructor() {
     this.socket = null;
@@ -17,7 +25,9 @@ class WebSocketService {
       if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_SOCKET_BASE_URL) {
         base = import.meta.env.VITE_SOCKET_BASE_URL;
       }
-    } catch (e) {}
+    } catch (e) {
+      /* ignore */
+    }
 
     if (!base && typeof process !== "undefined" && process.env && process.env.REACT_APP_WS_URL) {
       base = process.env.REACT_APP_WS_URL;
@@ -26,42 +36,46 @@ class WebSocketService {
     return base || null;
   }
 
-  // Normalize to http(s) because socket.io client expects http(s)/https more reliably
+  // Convert ws/wss -> http/https because socket.io client expects http(s) addresses
   _toHttpUrl(url) {
     if (!url) return null;
     if (url.startsWith("wss://")) return url.replace(/^wss:\/\//i, "https://");
     if (url.startsWith("ws://")) return url.replace(/^ws:\/\//i, "http://");
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    // assume https if bare host
+    // assume https for bare hosts
     return `https://${url}`;
   }
 
+  // --- Single, corrected connect implementation ---
   connect() {
     try {
       const configured = this.getConfiguredUrl();
       const base = configured || (typeof window !== "undefined" ? window.location.origin : "https://localhost");
       const socketUrl = this._toHttpUrl(base);
 
-      // token passed via auth (socket.io recommended)
+      // Token (JWT) from localStorage — send both auth and query for server compatibility
       const token = (typeof window !== "undefined" && localStorage.getItem("accessToken")) || null;
-      const auth = token ? { token } : undefined;
+      if (token) console.debug("[websocketService] using token (trim):", token.slice(0, 8) + "...");
 
+      // Avoid creating second socket if already connected/open
       if (this.socket && this.socket.connected) {
-        console.log("[websocketService] Already connected to", this.socket.id || this.socket.io?.uri || socketUrl);
+        console.log("[websocketService] Already connected to", this.socket.id || (this.socket.io && this.socket.io.uri) || socketUrl);
         return;
       }
 
       console.log("[websocketService] Attempting Socket.IO connect to:", socketUrl);
 
-      // NOTE: removed transports:["websocket"] so polling fallback works.
+      // Single io() call. Do not force transports so polling fallback works.
       this.socket = io(socketUrl, {
         path: "/socket.io",
-        auth,
+        auth: token ? { token } : undefined,    // preferred location (socket.handshake.auth)
+        query: token ? { token } : undefined,   // fallback for servers reading handshake.query
         withCredentials: true,
         reconnectionAttempts: this.maxReconnectAttempts,
-        reconnectionDelay: this.reconnectDelay,
+        reconnectionDelay: this.reconnectDelay
       });
 
+      // Connection lifecycle handlers
       this.socket.on("connect", () => {
         console.log("🔌 Socket.IO connected", this.socket.id);
         this.isConnected = true;
@@ -69,8 +83,14 @@ class WebSocketService {
         this.emit("connected", { id: this.socket.id });
       });
 
+      // server-side rejection detail often appears here
       this.socket.on("connect_error", (err) => {
-        console.error("❌ Socket.IO connect_error:", err && err.message ? err.message : err);
+        try {
+          const msg = (err && (err.message || (err.toString && err.toString()))) || err;
+          console.error("❌ Socket.IO connect_error:", msg);
+        } catch (e) {
+          console.error("❌ Socket.IO connect_error (couldn't stringify):", err);
+        }
         this.emit("error", err);
       });
 
@@ -80,27 +100,25 @@ class WebSocketService {
         this.emit("disconnected", reason);
       });
 
-      // forward server events
+      // Forward expected domain events into local listeners
       this.socket.on("friend_posted", (payload) => this.emit("friend_posted", payload));
       this.socket.on("friend_location_updated", (payload) => this.emit("friend_location_updated", payload));
       this.socket.on("new_friend_added", (payload) => this.emit("new_friend_added", payload));
       this.socket.on("friend_removed", (payload) => this.emit("friend_removed", payload));
       this.socket.on("friend_online_status", (payload) => this.emit("friend_online_status", payload));
 
-      // optional: forward unknown events
+      // Optionally forward any other event to local listeners
       if (typeof this.socket.onAny === "function") {
-        this.socket.onAny((event, payload) => {
-          // local listeners can subscribe to event names
-          this.emit(event, payload);
-        });
+        this.socket.onAny((event, payload) => this.emit(event, payload));
       }
+
     } catch (error) {
       console.error("Error connecting (socket.io):", error);
-      // socket.io client will perform reconnects automatically (based on options)
       this.reconnectAttempts++;
     }
   }
 
+  // Emit events to server (socket.io emit)
   send(type, payload) {
     if (this.socket && this.socket.connected) {
       try {
@@ -113,6 +131,7 @@ class WebSocketService {
     }
   }
 
+  // Local listener API (the rest of your app uses this)
   on(event, callback) {
     if (!this.listeners.has(event)) this.listeners.set(event, []);
     this.listeners.get(event).push(callback);
@@ -161,7 +180,9 @@ class WebSocketService {
       try {
         if (typeof this.socket.disconnect === "function") this.socket.disconnect();
         else if (typeof this.socket.close === "function") this.socket.close();
-      } catch (e) {}
+      } catch (e) {
+        /* ignore */
+      }
       this.socket = null;
     }
     this.isConnected = false;
@@ -173,8 +194,8 @@ class WebSocketService {
       isConnected: this.isConnected,
       reconnectAttempts: this.reconnectAttempts,
       listenersCount: this.listeners.size,
-      url: this.socket && this.socket.io ? (this.socket.io?.uri || this.getConfiguredUrl()) : this.getConfiguredUrl(),
-      socketId: this.socket ? this.socket.id : null,
+      url: this.socket && this.socket.io ? (this.socket.io.uri || this.getConfiguredUrl()) : this.getConfiguredUrl(),
+      socketId: this.socket ? this.socket.id : null
     };
   }
 }

@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useEffect } from "react";
 import MapboxMapView from "./components/MapboxMapView";
 import { CameraView } from "./components/CameraView";
@@ -21,7 +22,18 @@ import { LiquidEtherBackground } from "./components/LiquidEtherBackground";
 import { ImageUploadFlow } from "./components/ImageUploadFlow";
 import { motion, AnimatePresence } from "motion/react";
 import { MessageCircle, Settings } from "lucide-react";
-import { apiService } from './services/api'; 
+import { apiService } from './services/api';
+
+//
+// Dynamic backend base (uses Vite env if present, otherwise localhost in dev)
+//
+const BACKEND_BASE =
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  (window.location.hostname === 'localhost'
+    ? 'http://localhost:5001'
+    : 'https://snapcams.onrender.com');
+
+// ---------- Types ----------
 interface Pin {
   id: string;
   x: number;
@@ -102,6 +114,18 @@ interface ShareContent {
   description?: string;
 }
 
+// UI comment type used in optimistic updates
+interface UiComment {
+  id: string;
+  author: string;
+  authorAvatar?: string;
+  content: string;
+  likes: number;
+  isLiked: boolean;
+  timeAgo: string;
+  replies: UiComment[] | any[];
+}
+
 export default function App() {
   const getStoredUser = (): AppUser | null => {
     try {
@@ -112,7 +136,6 @@ export default function App() {
     }
   };
   const [user, setUser] = useState(getStoredUser());
-  
 
   // optional: try to validate token on mount and populate user if valid
   useEffect(() => {
@@ -123,7 +146,6 @@ export default function App() {
         const res = await apiService.getCurrentUser();
         if (res && res.success && res.data && res.data.user) {
           setUser(res.data.user as any);
-          // tokens already stored by apiService.login/register; if not, you can store here
         } else {
           // invalid token — clear local storage
           localStorage.removeItem('accessToken');
@@ -148,7 +170,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState("feed");
   const [showCamera, setShowCamera] = useState(false);
   const [showImageUpload, setShowImageUpload] = useState(false);
-  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [capturedPhoto, setCapturedPhoto] = useState<any>(null);
   const [showDuets, setShowDuets] = useState(false);
   const [showStories, setShowStories] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
@@ -161,10 +183,10 @@ export default function App() {
   const [showStoryUpload, setShowStoryUpload] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [followersModalType, setFollowersModalType] = useState("followers");
-  const [shareContent, setShareContent] = useState(null);
-  const [selectedChatUser, setSelectedChatUser] = useState(null);
-  const [selectedProfileUser, setSelectedProfileUser] = useState(null);
-  const [previousModal, setPreviousModal] = useState(null);
+  const [shareContent, setShareContent] = useState<ShareContent | null>(null);
+  const [selectedChatUser, setSelectedChatUser] = useState<any>(null);
+  const [selectedProfileUser, setSelectedProfileUser] = useState<any>(null);
+  const [previousModal, setPreviousModal] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState({
     id: "you",
     username: "you",
@@ -195,15 +217,15 @@ export default function App() {
     const key = (idOrAlias || '').toLowerCase();
     return aliasToObjectId[key] || '68c16d7ed3ffa114b597f1fe';
   };
-  const [selectedPostForDuet, setSelectedPostForDuet] = useState(null);
-  const [selectedPostForComments, setSelectedPostForComments] = useState(null);
+  const [selectedPostForDuet, setSelectedPostForDuet] = useState<string | null>(null);
+  const [selectedPostForComments, setSelectedPostForComments] = useState<string | null>(null);
   const [userStreak, setUserStreak] = useState(7);
-  const [savedPosts, setSavedPosts] = useState([]);
+  const [savedPosts, setSavedPosts] = useState<Pin[]>([]);
   const [userProfilePic, setUserProfilePic] = useState(
     "https://images.unsplash.com/photo-1724435811349-32d27f4d5806?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBhdmF0YXIlMjBwcm9maWxlfGVufDF8fHx8MTc1Njc4MTIzNHww&ixlib=rb-4.1.0&q=80&w=1080",
   );
 
-  const [pins, setPins] = useState([
+  const [pins, setPins] = useState<Pin[]>([
     {
       id: "1",
       x: 25,
@@ -318,7 +340,7 @@ export default function App() {
     },
   ]);
 
-  const [stories, setStories] = useState([
+  const [stories, setStories] = useState<Story[]>([
     {
       id: "story1",
       author: "alexandra_dreams",
@@ -579,8 +601,8 @@ export default function App() {
 
   const handleLike = async (postId: string) => {
     try {
-      // Send like to backend
-      const response = await fetch(`http://snapcams.onrender.com/api/posts/${postId}/like`, {
+      // Send like to backend using dynamic BACKEND_BASE
+      const response = await fetch(`${BACKEND_BASE}/api/posts/${postId}/like`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -606,8 +628,184 @@ export default function App() {
     );
   };
 
+  // Helper: try to find the server _id for a local post by fetching backend posts and matching by image or caption
+  const resolveServerId = async (localPostId: string): Promise<string | null> => {
+    try {
+      const res = await fetch(`${BACKEND_BASE}/api/posts`);
+      const json = await res.json();
+      if (res.ok && Array.isArray(json.data)) {
+        const found = json.data.find((p: any) => {
+          if (!p) return false;
+          const local = pins.find(pl => pl.id === localPostId);
+          if (!local) return false;
+          return p.image === local.image || p.caption === local.caption;
+        });
+        if (found && found._id) {
+          return found._id;
+        }
+      }
+    } catch (err) {
+      console.warn("resolveServerId error:", err);
+    }
+    return null;
+  };
+
+  // Fetch comments from backend and store in commentsMap
+  const [commentsMap, setCommentsMap] = useState<Record<string, UiComment[]>>({});
+
+  const fetchCommentsForPost = async (postId: string) => {
+    if (!postId) return;
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+      let backendPostId = postId;
+
+      // attempt request
+      let res = await fetch(`${BACKEND_BASE}/api/comments/post/${backendPostId}`, {
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+      });
+
+      // if server says not found, try to resolve mapping and retry once
+      if (res.status === 404) {
+        const resolved = await resolveServerId(postId);
+        if (resolved) {
+          backendPostId = resolved;
+          res = await fetch(`${BACKEND_BASE}/api/comments/post/${backendPostId}`, {
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+          });
+        }
+      }
+
+      const json = await res.json();
+      if (res.ok && json?.success) {
+        const mapped = (json.data?.comments || []).map((c: any) => ({
+          id: c._id || c.id,
+          author: (c.author && (c.author.displayName || c.author.username)) || 'User',
+          authorAvatar: c.author?.avatar || '',
+          content: c.content,
+          likes: Array.isArray(c.likes) ? c.likes.length : (c.likesCount || 0),
+          isLiked: false,
+          timeAgo: 'Just now',
+          replies: (c.replies || []).map((r: any) => ({
+            id: r._id || r.id,
+            author: (r.author && (r.author.displayName || r.author.username)) || 'User',
+            authorAvatar: r.author?.avatar || '',
+            content: r.content,
+            likes: Array.isArray(r.likes) ? r.likes.length : (r.likesCount || 0),
+            isLiked: false,
+            timeAgo: 'Just Now',
+          }))
+        })) as UiComment[];
+        // store under the original postId so UI continues to work
+        setCommentsMap(prev => ({ ...prev, [postId]: mapped }));
+      } else {
+        console.warn('fetchCommentsForPost: backend responded with non-success', json);
+      }
+    } catch (err) {
+      console.error('fetchCommentsForPost error', err);
+    }
+  };
+
+  // --- Single, corrected implementation of handleAddComment (removed duplicates / stray awaits) ---
+  const handleAddComment = async (content: string) => {
+    const postId = selectedPostForComments;
+    if (!postId) return;
+    if (!content || content.trim() === "") return;
+
+    // optimistic comment id
+    const tempId = `temp-${Date.now()}`;
+    const tempComment: UiComment = {
+      id: tempId,
+      author: userProfile.displayName || 'You',
+      authorAvatar: userProfile.avatar || '',
+      content,
+      likes: 0,
+      isLiked: false,
+      timeAgo: 'Just now',
+      replies: [],
+    };
+
+    // optimistic UI
+    setCommentsMap(prev => ({ ...prev, [postId]: [tempComment, ...(prev[postId] || [])] }));
+
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+      let backendPostId = postId;
+
+      // attempt POST
+      let res = await fetch(`${BACKEND_BASE}/api/comments/post/${backendPostId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ content })
+      });
+
+      // if 404 (post not found), try to resolve mapping and retry once
+      if (res.status === 404) {
+        const resolved = await resolveServerId(postId);
+        if (resolved) {
+          backendPostId = resolved;
+          res = await fetch(`${BACKEND_BASE}/api/comments/post/${backendPostId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ content })
+          });
+        }
+      }
+
+      // parse response
+      const json = await res.json();
+
+      if (res.ok && json?.success && json?.data?.comment) {
+        const c = json.data.comment;
+        const newComment: UiComment = {
+          id: c._id || c.id,
+          author: (c.author && (c.author.displayName || c.author.username)) || userProfile.displayName || 'You',
+          authorAvatar: c.author?.avatar || userProfile.avatar || '',
+          content: c.content,
+          likes: Array.isArray(c.likes) ? c.likes.length : (c.likesCount || 0),
+          isLiked: false,
+          timeAgo: 'Just now',
+          replies: [],
+        };
+
+        // replace temp in comments array
+        setCommentsMap(prev => ({
+          ...prev,
+          [postId]: (prev[postId] || []).map(cm => cm.id === tempId ? newComment : cm)
+        }));
+
+        // bump comments count on the pin
+        setPins(prev => prev.map(p => p.id === postId ? { ...p, comments: (p.comments || 0) + 1 } : p));
+      } else {
+        // remove temp and notify
+        setCommentsMap(prev => ({ ...prev, [postId]: (prev[postId] || []).filter(c => c.id !== tempId) }));
+        console.error('Failed to add comment', json?.message || json);
+        // optional: UI feedback
+      }
+    } catch (err) {
+      // network / unexpected error - rollback optimistic comment
+      setCommentsMap(prev => ({ ...prev, [postId]: (prev[postId] || []).filter(c => c.id !== tempId) }));
+      console.error('Add comment error:', err);
+      // optional: UI feedback
+    }
+  };
+
+  const handleLikeComment = (commentId: string) => {
+    console.log("Liking comment:", commentId);
+  };
+
+  const handleReplyToComment = (commentId: string, content: string) => {
+    console.log("Replying to comment:", commentId, content);
+  };
+
   const handleComment = (postId: string) => {
     setSelectedPostForComments(postId);
+    fetchCommentsForPost(postId);
     setShowCommentModal(true);
   };
 
@@ -626,9 +824,9 @@ export default function App() {
     setCurrentTab("feed");
   };
 
-  // Sample comments data
-  const generateCommentsForPost = (postId: string) => {
-    const sampleComments = [
+  // Sample comments generator for UI-only fallback
+  const generateCommentsForPost = (postId: any) => {
+    return [
       {
         id: "1",
         author: "aesthetic_soul",
@@ -673,7 +871,6 @@ export default function App() {
         timeAgo: "5h",
       },
     ];
-    return sampleComments;
   };
 
   const handleAddFriend = (friendId: string) => {
@@ -703,11 +900,11 @@ export default function App() {
       } else {
         setPreviousModal(null);
       }
-      
+
       // Close any open modals first with a small delay for smooth transition
       setShowFollowersModal(false);
       setShowOtherProfile(false);
-      
+
       // Small delay to allow modal close animation before opening chat
       setTimeout(() => {
         setSelectedChatUser(chatUser as any);
@@ -721,7 +918,7 @@ export default function App() {
     if (profileUser) {
       // Close followers modal if open with smooth transition
       setShowFollowersModal(false);
-      
+
       // Small delay to allow modal close animation before opening profile
       setTimeout(() => {
         setSelectedProfileUser(profileUser);
@@ -778,18 +975,6 @@ export default function App() {
       });
       setShowShareModal(true);
     }
-  };
-
-  const handleAddComment = (content: string) => {
-    console.log("Adding comment:", content);
-  };
-
-  const handleLikeComment = (commentId: string) => {
-    console.log("Liking comment:", commentId);
-  };
-
-  const handleReplyToComment = (commentId: string, content: string) => {
-    console.log("Replying to comment:", commentId, content);
   };
 
   const handleProfilePicChange = (imageUrl: string) => {
@@ -1020,7 +1205,7 @@ export default function App() {
         className={`absolute left-0 right-0 bottom-16 ${
           currentTab === "map" ? "top-0" : "top-16"
         }`}
-        style={{ 
+        style={{
           height: currentTab === "map" ? "calc(100vh - 64px)" : "calc(100vh - 128px)",
           width: '100%',
           position: 'absolute',
@@ -1183,7 +1368,7 @@ export default function App() {
             }}
             postAuthor={pins.find((pin) => pin.id === selectedPostForComments)?.author || ""}
             postImage={pins.find((pin) => pin.id === selectedPostForComments)?.image || ""}
-            comments={generateCommentsForPost(selectedPostForComments)}
+            comments={commentsMap[selectedPostForComments] || generateCommentsForPost(selectedPostForComments)}
             onAddComment={handleAddComment}
             onLikeComment={handleLikeComment}
             onReplyToComment={handleReplyToComment}
@@ -1210,7 +1395,7 @@ export default function App() {
               onBack={() => {
                 setShowIndividualChat(false);
                 setSelectedChatUser(null);
-                
+
                 // Restore previous modal if it existed
                 if (previousModal === 'followers') {
                   setTimeout(() => {

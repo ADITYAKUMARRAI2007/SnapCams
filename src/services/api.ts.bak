@@ -38,7 +38,7 @@ const RESOLVED_API_BASE = (
   (runtimeConfig && runtimeConfig.API_BASE) ||
   RUNTIME_WINDOW_API ||
   ENV_API_BASE ||
-  (isLocalhost ? 'https://snapcap-backend.onrender.com/api' : (typeof window !== 'undefined' ? `${window.location.origin.replace(/\/$/, '')}/api` : ''))
+  (isLocalhost ? 'http://snapcap-backend.onrender.com/api' : (typeof window !== 'undefined' ? `${window.location.origin.replace(/\/$/, '')}/api` : ''))
 );
 
 // Resolve socket base similarly
@@ -46,7 +46,7 @@ const RESOLVED_SOCKET_BASE = (
   (runtimeConfig && runtimeConfig.SOCKET_BASE) ||
   RUNTIME_WINDOW_SOCKET ||
   ENV_SOCKET_BASE ||
-  (isLocalhost ? 'https://snapcap-backend.onrender.com' : (typeof window !== 'undefined' ? window.location.origin : ''))
+  (isLocalhost ? 'http://snapcap-backend.onrender.com' : (typeof window !== 'undefined' ? window.location.origin : ''))
 );
 
 // Normalize (remove trailing slash)

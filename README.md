@@ -1,389 +1,243 @@
-# SnapCap Backend API
+cat > README.md <<'EOF'
+# 📸 SnapCams / SnapCap — Full-Stack AI-Powered Social Media Platform
 
-A comprehensive backend API for the SnapCap social media application built with Express.js, MongoDB, and Socket.IO.
+> A next-generation camera-first social media app that combines AI-driven creativity, real-time sharing, and cloud-backed scalability.
 
-## 🚀 Features
+SnapCams (SnapCap) is a complete social network prototype inspired by Snapchat and Instagram. It enables users to capture stories, share posts, chat in real time, and auto-generate captions using AI. Built with React + Vite on the frontend and Express + MongoDB + Socket.IO on the backend.
 
-### Core Features
-- **User Authentication & Authorization** - JWT-based auth with refresh tokens
-- **User Management** - Profile management, follow/unfollow system
-- **Posts** - Create, like, comment, share posts with images/videos
-- **Stories** - 24-hour expiring stories with multiple content types
-- **Comments** - Nested comments with replies and likes
-- **Duets** - Create duet responses to posts
-- **Real-time Chat** - Socket.IO powered messaging system
-- **Notifications** - Real-time notifications for all interactions
-- **Search** - Global search across users, posts, and hashtags
-- **File Upload** - Cloudinary integration for media storage
+================================================================================
+🧠 TECHNOLOGY STACK
+================================================================================
+Frontend: React (TypeScript), Vite, TailwindCSS, Mapbox
+Backend: Node.js, Express.js, MongoDB (Mongoose)
+Realtime: Socket.IO
+AI Layer: Google Gemini API
+Storage: Cloudinary
+Security: Helmet, CORS, JWT, express-rate-limit
+Deployment: Render (Backend) + Netlify/Vercel (Frontend)
 
-### Advanced Features
-- **Real-time Updates** - Socket.IO for live notifications and chat
-- **Rate Limiting** - API rate limiting for security
-- **Input Validation** - Comprehensive request validation
-- **Error Handling** - Centralized error handling
-- **Security** - Helmet.js security headers, CORS protection
-- **Database Indexing** - Optimized MongoDB queries
+================================================================================
+📁 PROJECT STRUCTURE
+================================================================================
+SnapCams/
+├── src/                         # Frontend (Vite + React)
+│   ├── components/              # Camera, Map, Feed, etc.
+│   ├── services/api.ts          # API Client
+│   ├── App.tsx / main.tsx       # Root App & Entry
+│   └── assets/                  # Icons / Images
+│
+├── snapcap-backend/             # Backend (Express)
+│   ├── src/models/              # MongoDB Models
+│   ├── src/routes/              # REST API Routes
+│   ├── src/services/            # Cloudinary, Gemini
+│   ├── src/middleware/          # Validation & Upload
+│   ├── src/socket/              # Realtime Handlers
+│   ├── server.js                # Express Server
+│   └── seedDatabase.js          # Seeder Script
+│
+├── .env.example                 # Frontend Example Env
+├── snapcap-backend/.env.example # Backend Example Env
+└── README.md                    # Documentation
 
-## 🛠️ Technology Stack
+================================================================================
+⚙️ SETUP INSTRUCTIONS
+================================================================================
 
-- **Runtime**: Node.js
-- **Framework**: Express.js
-- **Database**: MongoDB with Mongoose
-- **Real-time**: Socket.IO
-- **Authentication**: JWT (JSON Web Tokens)
-- **File Storage**: Cloudinary
-- **Security**: Helmet, CORS, Rate Limiting
-- **Validation**: Express Validator
+1️⃣ CLONE THE REPO
+git clone https://github.com/ADITYAKUMARRAI2007/SnapCams.git
+cd SnapCams
 
-## 📋 Prerequisites
-
-- Node.js (v14 or higher)
-- MongoDB (local or MongoDB Atlas)
-- Cloudinary account (for file storage)
-
-## 🚀 Quick Start
-
-### 1. Clone and Install Dependencies
-
-```bash
+2️⃣ BACKEND SETUP
 cd snapcap-backend
+cp .env.example .env
+# Edit .env with your own MONGODB_URI, CLOUDINARY, and JWT keys
 npm install
-```
-
-### 2. Environment Setup
-
-Create a `.env` file in the root directory:
-
-```env
-# Server Configuration
-NODE_ENV=development
-PORT=5000
-
-# Database
-MONGODB_URI=mongodb://localhost:27017/snapcap
-
-# JWT Secrets
-JWT_SECRET=your_super_secret_jwt_key_here
-JWT_REFRESH_SECRET=your_super_secret_refresh_key_here
-JWT_EXPIRE=7d
-JWT_REFRESH_EXPIRE=30d
-
-# Cloudinary Configuration
-CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
-CLOUDINARY_API_KEY=your_cloudinary_api_key
-CLOUDINARY_API_SECRET=your_cloudinary_api_secret
-
-# Frontend URL
-CLIENT_URL=http://localhost:3000
-```
-
-### 3. Start the Server
-
-```bash
-# Development mode
 npm run dev
+# Server will run on http://localhost:5001
+curl http://localhost:5001/health
 
-# Production mode
-npm start
-```
+3️⃣ FRONTEND SETUP
+cd ..
+npm install
+npm run dev
+# App runs on http://localhost:3000
 
-The server will start on `http://localhost:5000`
+================================================================================
+🧩 BACKEND API DOCUMENTATION
+================================================================================
 
-## 📚 API Documentation
+--- AUTHENTICATION ---
+POST /api/auth/register        → Register new user
+POST /api/auth/login           → Login user
+POST /api/auth/logout          → Logout
+POST /api/auth/refresh-token   → Refresh access token
+GET  /api/auth/me              → Get current user
+GET  /api/auth/verify          → Verify token
 
-### Authentication Endpoints
+--- USER ---
+GET  /api/users/profile        → Get user profile
+PUT  /api/users/profile        → Update profile
+POST /api/users/avatar         → Upload avatar
+GET  /api/users/:username      → Get user by username
+GET  /api/users/:username/posts      → User posts
+GET  /api/users/:username/followers  → Followers
+GET  /api/users/:username/following  → Following
+POST /api/users/:userId/follow       → Follow/unfollow
+GET  /api/users/search         → Search users
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login user |
-| POST | `/api/auth/logout` | Logout user |
-| POST | `/api/auth/refresh-token` | Refresh access token |
-| GET | `/api/auth/me` | Get current user |
-| GET | `/api/auth/verify` | Verify token |
+--- POSTS ---
+GET  /api/posts                → Get feed posts
+POST /api/posts                → Create post
+GET  /api/posts/:postId        → Get single post
+PUT  /api/posts/:postId        → Update post
+DELETE /api/posts/:postId      → Delete post
+POST /api/posts/:postId/like   → Like/unlike
+POST /api/posts/:postId/save   → Save/unsave
+POST /api/posts/:postId/share  → Share post
+GET  /api/posts/:postId/comments → Get comments
+GET  /api/posts/trending       → Trending posts
+GET  /api/posts/explore        → Explore feed
+POST /api/posts/generate-caption → AI caption generation (GeminiService)
 
-### User Endpoints
+--- STORIES ---
+GET  /api/stories              → Get all active stories
+POST /api/stories              → Create new story
+GET  /api/stories/:storyId     → Get story details
+POST /api/stories/:storyId/view → Mark viewed
+DELETE /api/stories/:storyId   → Delete story
+GET  /api/stories/user/:userId → Get user’s stories
+POST /api/stories/:storyId/content → Add media to story
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/users/profile` | Get user profile |
-| PUT | `/api/users/profile` | Update user profile |
-| POST | `/api/users/avatar` | Upload avatar |
-| GET | `/api/users/:username` | Get user by username |
-| GET | `/api/users/:username/posts` | Get user posts |
-| GET | `/api/users/:username/stories` | Get user stories |
-| GET | `/api/users/:username/followers` | Get user followers |
-| GET | `/api/users/:username/following` | Get user following |
-| POST | `/api/users/:userId/follow` | Follow/unfollow user |
-| GET | `/api/users/search` | Search users |
+--- COMMENTS ---
+GET  /api/comments/post/:postId → Get post comments
+POST /api/comments/post/:postId → Add comment
+GET  /api/comments/:commentId   → Get specific comment
+PUT  /api/comments/:commentId   → Update comment
+DELETE /api/comments/:commentId → Delete comment
+POST /api/comments/:commentId/like → Like/unlike
+POST /api/comments/:commentId/pin  → Pin/unpin
+GET  /api/comments/:commentId/replies → Get replies
 
-### Post Endpoints
+--- DUETS ---
+GET  /api/duets                → Get all duets
+POST /api/duets/post/:postId   → Create duet
+GET  /api/duets/:duetId        → Get duet
+PUT  /api/duets/:duetId        → Update duet
+DELETE /api/duets/:duetId      → Delete duet
+POST /api/duets/:duetId/like   → Like/unlike duet
+GET  /api/duets/user/:userId   → Get user duets
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/posts` | Get feed posts |
-| POST | `/api/posts` | Create new post |
-| GET | `/api/posts/:postId` | Get specific post |
-| PUT | `/api/posts/:postId` | Update post |
-| DELETE | `/api/posts/:postId` | Delete post |
-| POST | `/api/posts/:postId/like` | Like/unlike post |
-| POST | `/api/posts/:postId/save` | Save/unsave post |
-| POST | `/api/posts/:postId/share` | Share post |
-| GET | `/api/posts/:postId/comments` | Get post comments |
-| GET | `/api/posts/trending` | Get trending posts |
-| GET | `/api/posts/explore` | Get explore posts |
+--- CHAT ---
+GET  /api/chat/conversations   → Get user conversations
+POST /api/chat/conversations   → Start chat
+GET  /api/chat/conversations/:conversationId/messages → Get messages
+POST /api/chat/messages        → Send message
+PUT  /api/chat/messages/:messageId/read → Mark read
+DELETE /api/chat/messages/:messageId → Delete message
+GET  /api/chat/unread-count    → Get unread count
+PUT  /api/chat/conversations/:conversationId/read-all → Read all
 
-### Story Endpoints
+--- NOTIFICATIONS ---
+GET  /api/notifications                → All notifications
+GET  /api/notifications/:notificationId → Specific notification
+PUT  /api/notifications/:notificationId/read → Mark as read
+PUT  /api/notifications/read-all       → Mark all as read
+DELETE /api/notifications/:notificationId → Delete notification
+GET  /api/notifications/unread-count   → Unread count
+GET  /api/notifications/type/:type     → Filter by type
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/stories` | Get active stories |
-| POST | `/api/stories` | Create new story |
-| GET | `/api/stories/:storyId` | Get specific story |
-| POST | `/api/stories/:storyId/view` | Mark story as viewed |
-| DELETE | `/api/stories/:storyId` | Delete story |
-| GET | `/api/stories/user/:userId` | Get user stories |
-| POST | `/api/stories/:storyId/content` | Add content to story |
+--- SEARCH ---
+GET /api/search/users          → Search users
+GET /api/search/posts          → Search posts
+GET /api/search/hashtags       → Search hashtags
+GET /api/search/trending/hashtags → Trending tags
+GET /api/search/hashtag/:hashtag → Posts under hashtag
+GET /api/search/global         → Global search
 
-### Comment Endpoints
+================================================================================
+🔌 SOCKET.IO EVENTS
+================================================================================
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/comments/post/:postId` | Get post comments |
-| POST | `/api/comments/post/:postId` | Create comment |
-| GET | `/api/comments/:commentId` | Get specific comment |
-| PUT | `/api/comments/:commentId` | Update comment |
-| DELETE | `/api/comments/:commentId` | Delete comment |
-| POST | `/api/comments/:commentId/like` | Like/unlike comment |
-| POST | `/api/comments/:commentId/pin` | Pin/unpin comment |
-| GET | `/api/comments/:commentId/replies` | Get comment replies |
+CLIENT → SERVER
+join_conversation   { conversationId }
+typing_start        { conversationId, receiverId }
+typing_stop         { conversationId, receiverId }
+message_sent        { conversationId, receiverId, message }
+post_liked          { postId, postAuthorId }
+user_followed       { followedUserId }
+story_viewed        { storyId, storyAuthorId }
 
-### Duet Endpoints
+SERVER → CLIENT
+user_online         { userId }
+user_offline        { userId }
+new_message         { message, conversation }
+user_typing         { userId, username }
+new_notification    { type, fromUser }
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/duets` | Get all duets |
-| POST | `/api/duets/post/:postId` | Create duet |
-| GET | `/api/duets/:duetId` | Get specific duet |
-| GET | `/api/duets/post/:postId` | Get post duets |
-| PUT | `/api/duets/:duetId` | Update duet |
-| DELETE | `/api/duets/:duetId` | Delete duet |
-| POST | `/api/duets/:duetId/like` | Like/unlike duet |
-| GET | `/api/duets/user/:userId` | Get user duets |
+================================================================================
+🧠 AI CAPTION FLOW
+================================================================================
+Frontend → apiService.generateCaption() → sends image + context (mood, location)
+Backend  → /api/posts/generate-caption → GeminiService.js handles AI
+Gemini API → returns caption + hashtags → frontend displays with regenerate option
 
-### Chat Endpoints
+================================================================================
+🧪 SEEDING DEMO DATA
+================================================================================
+cd snapcap-backend
+node seedDatabase.js
+# Creates demo users, posts, stories, chats, notifications
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/chat/conversations` | Get user conversations |
-| POST | `/api/chat/conversations` | Start new conversation |
-| GET | `/api/chat/conversations/:conversationId/messages` | Get conversation messages |
-| POST | `/api/chat/messages` | Send message |
-| PUT | `/api/chat/messages/:messageId/read` | Mark message as read |
-| DELETE | `/api/chat/messages/:messageId` | Delete message |
-| GET | `/api/chat/unread-count` | Get unread message count |
-| PUT | `/api/chat/conversations/:conversationId/read-all` | Mark all messages as read |
+================================================================================
+🔒 SECURITY FEATURES
+================================================================================
+✔ JWT access & refresh tokens
+✔ Helmet.js headers
+✔ express-rate-limit
+✔ bcrypt password hashing
+✔ Input validation (express-validator)
+✔ Centralized error handling
+✔ CORS whitelisting for secure origins
 
-### Notification Endpoints
+================================================================================
+🚀 DEPLOYMENT
+================================================================================
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/notifications` | Get user notifications |
-| GET | `/api/notifications/:notificationId` | Get specific notification |
-| PUT | `/api/notifications/:notificationId/read` | Mark notification as read |
-| PUT | `/api/notifications/read-all` | Mark all notifications as read |
-| DELETE | `/api/notifications/:notificationId` | Delete notification |
-| GET | `/api/notifications/unread-count` | Get unread notification count |
-| GET | `/api/notifications/type/:type` | Get notifications by type |
+--- BACKEND (Render) ---
+git push render main
+Backend live at: https://snapcap-backend.onrender.com
 
-### Search Endpoints
+--- FRONTEND (Netlify/Vercel) ---
+npm run build
+Deploy dist/ folder
+Frontend live at: https://snapcams.netlify.app
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/search/users` | Search users |
-| GET | `/api/search/posts` | Search posts |
-| GET | `/api/search/hashtags` | Search hashtags |
-| GET | `/api/search/trending/hashtags` | Get trending hashtags |
-| GET | `/api/search/hashtag/:hashtag` | Get posts by hashtag |
-| GET | `/api/search/global` | Global search |
+================================================================================
+🧰 USEFUL COMMANDS
+================================================================================
+npm run dev         → Development mode
+npm start           → Production mode
+npm run build       → Build frontend
+node seedDatabase.js → Seed demo data
 
-## 🔌 Socket.IO Events
-
-### Client to Server Events
-
-| Event | Description | Data |
-|-------|-------------|------|
-| `join_conversation` | Join conversation room | `{ conversationId }` |
-| `leave_conversation` | Leave conversation room | `{ conversationId }` |
-| `typing_start` | Start typing indicator | `{ conversationId, receiverId }` |
-| `typing_stop` | Stop typing indicator | `{ conversationId, receiverId }` |
-| `post_liked` | Post liked | `{ postId, postAuthorId }` |
-| `post_commented` | Post commented | `{ postId, postAuthorId, commentId }` |
-| `user_followed` | User followed | `{ followedUserId }` |
-| `story_viewed` | Story viewed | `{ storyId, storyAuthorId }` |
-| `duet_created` | Duet created | `{ originalPostId, originalPostAuthorId, duetId }` |
-| `message_sent` | Message sent | `{ conversationId, receiverId, messageId }` |
-| `user_mentioned` | User mentioned | `{ mentionedUserId, postId, commentId }` |
-
-### Server to Client Events
-
-| Event | Description | Data |
-|-------|-------------|------|
-| `user_online` | User came online | `{ userId, username, isOnline }` |
-| `user_offline` | User went offline | `{ userId, username, isOnline }` |
-| `new_message` | New message received | `{ message, conversation }` |
-| `user_typing` | User typing indicator | `{ userId, username, isTyping }` |
-| `new_notification` | New notification | `{ type, fromUser, message, ... }` |
-
-## 🗄️ Database Models
-
-### User Model
-- Basic profile information
-- Authentication data
-- Follow relationships
-- Settings and preferences
-
-### Post Model
-- Content and media
-- Engagement metrics
-- Location data
-- Privacy settings
-
-### Story Model
-- Multiple content items
-- Expiration handling
-- View tracking
-- Media overlays
-
-### Comment Model
-- Nested replies
-- Like system
-- Pin functionality
-
-### Duet Model
-- Original post reference
-- Response content
-- Engagement tracking
-
-### Message Model
-- Real-time messaging
-- Media support
-- Read receipts
-
-### Conversation Model
-- Participant management
-- Unread counts
-- Last message tracking
-
-### Notification Model
-- Multiple notification types
-- Read status
-- Real-time delivery
-
-## 🔒 Security Features
-
-- **JWT Authentication** - Secure token-based authentication
-- **Rate Limiting** - Prevent API abuse
-- **Input Validation** - Comprehensive request validation
-- **CORS Protection** - Cross-origin request security
-- **Helmet.js** - Security headers
-- **Password Hashing** - bcrypt password encryption
-- **File Upload Security** - Secure file handling
-
-## 🚀 Deployment
-
-### Environment Variables for Production
-
-```env
-NODE_ENV=production
-PORT=5000
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/snapcap
-JWT_SECRET=your_production_jwt_secret
-JWT_REFRESH_SECRET=your_production_refresh_secret
-CLOUDINARY_CLOUD_NAME=your_cloudinary_name
-CLOUDINARY_API_KEY=your_cloudinary_key
-CLOUDINARY_API_SECRET=your_cloudinary_secret
-CLIENT_URL=https://your-frontend-domain.com
-```
-
-### Deploy to Heroku
-
-```bash
-# Install Heroku CLI
-npm install -g heroku
-
-# Login to Heroku
-heroku login
-
-# Create Heroku app
-heroku create your-app-name
-
-# Set environment variables
-heroku config:set NODE_ENV=production
-heroku config:set MONGODB_URI=your_mongodb_uri
-heroku config:set JWT_SECRET=your_jwt_secret
-# ... set other variables
-
-# Deploy
-git push heroku main
-```
-
-## 🧪 Testing
-
-```bash
-# Run tests (when implemented)
-npm test
-
-# Run with coverage
-npm run test:coverage
-```
-
-## 📝 API Response Format
-
-All API responses follow this format:
-
-```json
-{
-  "success": true,
-  "message": "Operation successful",
-  "data": {
-    // Response data
-  }
-}
-```
-
-Error responses:
-
-```json
-{
-  "success": false,
-  "message": "Error description",
-  "errors": [
-    // Validation errors (if any)
-  ]
-}
-```
-
-## 🤝 Contributing
-
+================================================================================
+🤝 CONTRIBUTING
+================================================================================
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+2. Create a branch (feature/your-feature)
+3. Commit with clear message
+4. Submit pull request
 
-## 📄 License
+================================================================================
+🧾 LICENSE
+================================================================================
+Licensed under ISC License © 2025 SnapCap Project
 
-This project is licensed under the ISC License.
-
-## 🆘 Support
-
-For support, email your-email@example.com or create an issue in the repository.
-
----
-
-**Happy Coding! 🚀**
-
-
-
-
+================================================================================
+💛 CREDITS & SUPPORT
+================================================================================
+Developed by Aditya Kumar Rai
+📧 yourname@example.com
+🐙 GitHub: https://github.com/ADITYAKUMARRAI2007
+“Built for creators. Powered by AI. Connected in real time.” 🚀
+EOF
